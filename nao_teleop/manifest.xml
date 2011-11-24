@@ -1,0 +1,19 @@
+<package>
+  <description brief="nao_teleop">
+
+     nao_teleop
+
+  </description>
+  <author>Armin Hornung</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/nao_teleop</url>
+  <depend package="joy"/>
+  <depend package="actionlib"/>
+  <depend package="nav_msgs"/>
+  <depend package="nao_msgs"/>
+  <depend package="std_srvs"/>
+
+</package>
+
+

@@ -14,13 +14,11 @@
   <url>http://ros.org/wiki/nao_remote</url>
     
   <depend package="std_msgs"/>
-  <depend package="sensor_msgs"/>
   <depend package="nav_msgs"/>
   <depend package="std_srvs"/>
   <depend package="geometry_msgs"/>
   <depend package="roscpp"/>
   <depend package="tf"/>
-  <depend package="joy"/>
   <depend package="nao_msgs"/>
   <depend package="nao_description"/>
   <depend package="message_filters"/>
