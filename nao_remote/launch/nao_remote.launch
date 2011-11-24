@@ -1,0 +1,16 @@
+<!--
+  Launches all nodes necessary to run off-board Nao (remote on the PC) for various control types.
+  Requires the nao_ctrl nodes to be running either on Nao or also remotely.
+  To start teleoperation, you need to additionally launch teleop_joy.launch 
+-->
+  
+
+<launch>
+  <include file="$(find nao_description)/launch/nao_state_publisher.launch" />
+  <node pkg="nao_remote" type="remap_odometry" name="remap_odometry" />
+  <node pkg="nao_remote" type="pose_manager.py" name="pose_manager">
+    <rosparam file="$(find nao_remote)/config/basic_poses.yaml" command="load" ns="poses"/>
+  </node>
+  
+
+</launch>

@@ -1,0 +1,10 @@
+<launch>
+  <!-- start control script locally, rest is same as teleop_nao -->
+  
+  <include file="$(find nao_ctrl)/launch/nao_ctrl.launch" />
+  <include file="$(find nao_remote)/launch/teleop_nao.launch" />
+    
+  <!-- only useful for Webots: -->
+  <!--<param name="remap_odometry/use_imu_angles" value="True" /> 
+  <param name="remap_odometry/imu_topic" value="sim_imu" /> -->
+</launch>

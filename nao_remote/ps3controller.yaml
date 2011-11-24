@@ -1,0 +1,16 @@
+axis_x: 3
+axis_y: 2
+axis_turn: 0
+btn_crouch: 0
+btn_enable_control: 3
+btn_head_mod: 11
+btn_start_scan: 13
+btn_stop_scan: 12
+btn_init_pose: 15
+
+
+
+# 11: R1, 10:L1, 9:R2, 8:L2, 12:dreieck, 13:kreis, 14:x, 15:quadrat
+# 0: select, 1: left stick, 2: right stick, 3:start, 4: up, 5:right, 6:down, 7:left
+# 16: playstation button
+
