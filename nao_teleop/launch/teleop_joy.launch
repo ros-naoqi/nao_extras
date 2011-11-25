@@ -1,6 +1,6 @@
 <!-- launches only joystick-related nodes for Nao -->
 
 <launch>
-  <node pkg="nao_remote" type="teleop_nao_joy" name="teleop_nao_joy" />
+  <node pkg="nao_teleop" type="teleop_nao_joy" name="teleop_nao_joy" />
   <node pkg="joy" type="joy_node" name="joy_node" />
 </launch>

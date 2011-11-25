@@ -2,5 +2,5 @@
 
 <launch>
   <include file="$(find nao_remote)/launch/nao_remote.launch" />
-  <include file="$(find nao_remote)/launch/teleop_joy.launch" />
+  <include file="$(find nao_teleop)/launch/teleop_joy.launch" />
 </launch>
