@@ -2,7 +2,7 @@
   <!-- start control script locally, rest is same as teleop_nao -->
   
   <include file="$(find nao_driver)/launch/nao_driver.launch" />
-  <include file="$(find nao_remote)/launch/teleop_nao.launch" />
+  <include file="$(find nao_teleop)/launch/teleop_nao.launch" />
     
   <!-- only useful for Webots: -->
   <!--<param name="remap_odometry/use_imu_angles" value="True" /> 
