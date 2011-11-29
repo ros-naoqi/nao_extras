@@ -1,7 +1,7 @@
 <launch>
   <!-- start control script locally, rest is same as teleop_nao -->
   
-  <include file="$(find nao_ctrl)/launch/nao_ctrl.launch" />
+  <include file="$(find nao_driver)/launch/nao_driver.launch" />
   <include file="$(find nao_remote)/launch/teleop_nao.launch" />
     
   <!-- only useful for Webots: -->
