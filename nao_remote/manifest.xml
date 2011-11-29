@@ -3,8 +3,8 @@
 	<p>
      Remote control package for the Nao robot. 
      Provides a node for Nao joystick teleoperation and odometry remapping into ROS format.
-     The motion commands should be sent to a <a href="http://www.ros.org/wiki/nao_ctrl">
-     nao_ctrl</a> node, which in turn sends back robot state and odometry.     
+     The motion commands should be sent to a <a href="http://www.ros.org/wiki/nao_driver">
+     nao_driver</a> node, which in turn sends back robot state and odometry.     
     </p>
 
   </description>

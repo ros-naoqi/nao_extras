@@ -7,7 +7,7 @@ import roslib
 roslib.load_manifest('nao_remote')
 import rospy
 
-from nao_ctrl.msg import TorsoOdometry
+from nao_msgs.msg import TorsoOdometry
 from nav_msgs.msg import Odometry
 
 def handleTorsoOdom(data):
