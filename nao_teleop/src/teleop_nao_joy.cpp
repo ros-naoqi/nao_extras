@@ -91,6 +91,7 @@ class TeleopNaoJoy
       double m_maxVw;
       double m_maxHeadYaw;
       double m_maxHeadPitch;
+      ros::Duration m_bodyPoseTimeOut;
       int m_inhibitCounter;
 
       bool m_previousJoystick_initialized;
@@ -117,6 +118,7 @@ TeleopNaoJoy::TeleopNaoJoy()
    m_crouchBtn(9), m_initPoseBtn(0), m_enableBtn(8), m_modifyHeadBtn(5),
    m_maxVx(1.0), m_maxVy(1.0), m_maxVw(0.5),
    m_maxHeadYaw(2.0943), m_maxHeadPitch(0.7853),
+   m_bodyPoseTimeOut(5.0),
    m_inhibitCounter(0), m_previousJoystick_initialized(false),
    m_bodyPoseClient("body_pose", true)
 {
@@ -153,7 +155,11 @@ TeleopNaoJoy::TeleopNaoJoy()
    m_stiffnessDisableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/disable");
    m_stiffnessEnableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/enable");
 
-   m_bodyPoseClient.waitForServer(ros::Duration(3.0));
+   if (!m_bodyPoseClient.waitForServer(ros::Duration(3.0))){
+	   ROS_WARN_STREAM("Could not connect to \"body_pose\" action server, "
+			   << "there will be no body poses available on button presses.\n"
+			   << "Is the pose_manager node running?");
+   }
 
 }
 
@@ -175,10 +181,11 @@ TeleopNaoJoy::TeleopNaoJoy()
          m_previousJoystick_initialized = true;
       }
       // Buttons:
-      if (m_enabled && buttonTriggered(m_crouchBtn, joy)){
+      // TODO: make buttons generally configurable by mapping btn_id => pose_string
+      if (m_enabled && buttonTriggered(m_crouchBtn, joy) && m_bodyPoseClient.isServerConnected()){
     	 nao_msgs::BodyPoseGoal goal;
     	 goal.pose_name = "crouch";
-         m_bodyPoseClient.sendGoalAndWait(goal);
+         m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
          actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
          if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
         	 ROS_ERROR("%s pose action did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
@@ -189,10 +196,10 @@ TeleopNaoJoy::TeleopNaoJoy()
          ROS_DEBUG("crouch btn action done");
       }
 
-      if (m_enabled && buttonTriggered(m_initPoseBtn, joy)){
+      if (m_enabled && buttonTriggered(m_initPoseBtn, joy) && m_bodyPoseClient.isServerConnected()){
     	 nao_msgs::BodyPoseGoal goal;
     	 goal.pose_name = "init";
-    	 m_bodyPoseClient.sendGoalAndWait(goal);
+    	 m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
     	 actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
     	 if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
     		 ROS_ERROR("Pose action \"%s\" did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());

@@ -66,20 +66,23 @@ class PoseManager():
                                                        execute_cb=self.executeBodyPose,
                                                        auto_start=False)
         self.trajectoryClient = actionlib.SimpleActionClient("joint_trajectory", JointTrajectoryAction)
-        self.trajectoryClient.wait_for_server()
-        
-        try:
-            rospy.wait_for_service("stop_walk_srv", timeout=2.0)
-            self.stopWalkSrv = rospy.ServiceProxy("stop_walk_srv", Empty)
-        except:
-            rospy.logwarn("stop_walk_srv not available, pose_manager will not stop the walker before executing a trajectory. "
+        if self.trajectoryClient.wait_for_server(rospy.Duration(3.0)):
+            try:
+                rospy.wait_for_service("stop_walk_srv", timeout=2.0)
+                self.stopWalkSrv = rospy.ServiceProxy("stop_walk_srv", Empty)
+            except:
+                rospy.logwarn("stop_walk_srv not available, pose_manager will not stop the walker before executing a trajectory. "
                           +"This is normal if there is no nao_walker running.")
             self.stopWalkSrv = None
+            self.poseServer.start()
+        
+            rospy.loginfo("pose_manager running, offering poses: %s", self.poseLibrary.keys());
             
+        else:
+            rospy.logfatal("Could not connect to required \"joint_trajectory\" action server, is the nao_controller node running?");
+            rospy.signal_shutdown("Required component missing");
         
-        self.poseServer.start()
         
-        rospy.loginfo("pose_manager running, offering poses: %s", self.poseLibrary.keys());
     
             
     def readInPoses(self):        
