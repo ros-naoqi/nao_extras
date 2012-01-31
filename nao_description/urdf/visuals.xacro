@@ -127,4 +127,10 @@
     
     <xacro:macro name="insert_visualization_cameraBottom" params="">
     </xacro:macro>
+
+    <xacro:macro name="insert_visualization_fingers" params="side">
+    </xacro:macro>
+
+    <xacro:macro name="insert_visualization_elbow_yaw" params="side">
+    </xacro:macro>
 </robot>

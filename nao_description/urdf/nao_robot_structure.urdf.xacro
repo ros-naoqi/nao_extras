@@ -96,6 +96,8 @@
       <mass value="0.05959"/>
       <inertia ixx="0"  ixy="0"  ixz="0" iyy="0" iyz="0" izz="0" />
     </inertial>    
+
+    <xacro:insert_visualization_elbow_yaw side="${side}"/>
   </link>
   
   <link name = "${side}ElbowRoll_link">
@@ -117,7 +119,9 @@
     <xacro:insert_visualization_wrist side="${side}"/>    
   </link>
   
-  <link name="${side}Hand_link" />
+  <link name="${side}Hand_link">
+    <xacro:insert_visualization_fingers side="${side}"/>    
+  </link>
   </xacro:macro> 
   
   <xacro:arm_links side="L" reflect="-1"/>
