@@ -1,7 +1,9 @@
 <launch>
   <!-- start control script locally, rest is same as teleop_nao -->
-  
+  <param name="nao_sensors/use_joint_sensors" value="False" />
   <include file="$(find nao_driver)/launch/nao_driver.launch" />
+  
+  
   <include file="$(find nao_teleop)/launch/teleop_nao.launch" />
     
   <!-- only useful for Webots: -->
