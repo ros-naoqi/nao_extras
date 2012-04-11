@@ -25,7 +25,7 @@
 -->
 
   <include filename="$(find nao_description)/urdf/visuals.xacro" />
-  <include filename="$(find nao_description)/urdf/nao_robot_structure.urdf.xacro" />
+  <include filename="$(find nao_description)/urdf/nao_robot_v3_structure.urdf.xacro" />
   
   
 </robot>

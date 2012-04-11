@@ -1,6 +1,3 @@
 <launch>
-  <param name="robot_description" command="$(find xacro)/xacro.py $(find nao_description)/urdf/nao_robot.urdf.xacro" />  
-  <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher" >
-     
-  </node>
+  <include file="$(find nao_description)/launch/nao_v3_publisher.launch" />
 </launch>
