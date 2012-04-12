@@ -301,15 +301,23 @@
   <xacro:arm_joints side="R" reflect="1"/>  
   
   <!-- Leg joints -->
-  <xacro:macro name="leg_joints" params="side reflect">
-  <joint name="${side}HipYawPitch" type="revolute">
+  <joint name="LHipYawPitch" type="revolute">
     <parent link="Torso_link"/>
-    <child link="${side}HipYawPitch_link"/>
-    <origin xyz="0 ${reflect*-0.05} -0.085" rpy="0 0 0"/>
-    <axis xyz="0 0.707106 ${reflect*(0.707106)}"/>
+    <child link="LHipYawPitch_link"/>
+    <origin xyz="0 0.05 -0.085" rpy="0 0 0"/>
+    <axis xyz="0 0.707106 -0.707106"/>
     <limit velocity="3.0" effort="30" lower="-1.145303" upper="0.740810"/>
   </joint>
+  <joint name="RHipYawPitch" type="revolute">
+    <parent link="Torso_link"/>
+    <child link="RHipYawPitch_link"/>
+    <origin xyz="0 -0.05 -0.085" rpy="0 0 0"/>
+    <axis xyz="0 0.707106 0.707106"/>
+    <limit velocity="3.0" effort="30" lower="-1.145303" upper="0.740810"/>
+    <mimic joint="LHipYawPitch" multiplier="1" offset="0"/>
+  </joint>
   
+  <xacro:macro name="leg_joints" params="side reflect">
   <joint name="${side}HipPitch" type="revolute">
     <parent link="${side}HipRoll_link"/>
     <child link="${side}HipPitch_link"/>
