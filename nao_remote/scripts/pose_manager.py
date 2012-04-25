@@ -41,8 +41,8 @@ roslib.load_manifest('nao_remote')
 import rospy
 import sys
 
-import roslib.rostime
-from roslib.rostime import Duration
+import rospy.rostime
+from rospy.rostime import Duration
 
 import actionlib
 from actionlib_msgs.msg import GoalStatus
@@ -50,19 +50,19 @@ import nao_msgs.msg
 from nao_msgs.msg import JointTrajectoryGoal, JointTrajectoryAction, BodyPoseAction, BodyPoseGoal
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from sensor_msgs.msg import JointState 
+from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from std_msgs.msg import Bool
 from std_srvs.srv import Empty
 
 class PoseManager():
-    def __init__(self):    
+    def __init__(self):
         # ROS initialization:
         rospy.init_node('pose_manager')
-            
+
         self.poseLibrary = dict()
         self.readInPoses()
-        self.poseServer = actionlib.SimpleActionServer("body_pose", BodyPoseAction, 
+        self.poseServer = actionlib.SimpleActionServer("body_pose", BodyPoseAction,
                                                        execute_cb=self.executeBodyPose,
                                                        auto_start=False)
         self.trajectoryClient = actionlib.SimpleActionClient("joint_trajectory", JointTrajectoryAction)
@@ -75,20 +75,20 @@ class PoseManager():
                           +"This is normal if there is no nao_walker running.")
             self.stopWalkSrv = None
             self.poseServer.start()
-        
+
             rospy.loginfo("pose_manager running, offering poses: %s", self.poseLibrary.keys());
-            
+
         else:
             rospy.logfatal("Could not connect to required \"joint_trajectory\" action server, is the nao_controller node running?");
             rospy.signal_shutdown("Required component missing");
-        
-        
-    
-            
-    def readInPoses(self):        
+
+
+
+
+    def readInPoses(self):
         poses = rospy.get_param('~poses')
         rospy.loginfo("Found %d poses on the param server", len(poses))
-        
+
         for key,value in poses.iteritems():
             try:
             # TODO: handle multiple points in trajectory
@@ -102,7 +102,7 @@ class PoseManager():
             except:
                 rospy.logwarn("Could not parse pose \"%s\" from the param server:", key);
                 rospy.logwarn(sys.exc_info())
-        
+
         # add a default crouching pose:
         if not "crouch" in self.poseLibrary:
             trajectory = JointTrajectory()
@@ -116,18 +116,18 @@ class PoseManager():
                 1.545, -0.33, 1.57, 0.486, 0.0, 0.0]        # right arm
             trajectory.points = [point]
             self.poseLibrary["crouch"] = trajectory;
-                   
 
-    def executeBodyPose(self, goal):     
+
+    def executeBodyPose(self, goal):
         if not goal.pose_name in self.poseLibrary:
             rospy.loginfo("Pose %s not in library, reload library from parameters..." % goal.pose_name)
             self.readInPoses()
-        
+
         if goal.pose_name in self.poseLibrary:
             rospy.loginfo("Executing body pose %s...", goal.pose_name);
             if not self.stopWalkSrv is None:
                 self.stopWalkSrv()
-            
+
             trajGoal = JointTrajectoryGoal()
             # time out one sec. after trajectory ended:
             trajGoal.trajectory = self.poseLibrary[goal.pose_name]
@@ -137,15 +137,15 @@ class PoseManager():
             self.trajectoryClient.send_goal_and_wait(trajGoal, timeout)
             if self.trajectoryClient.get_state() != GoalStatus.SUCCEEDED:
                 self.poseServer.set_aborted(text="JointTrajectory action did not succeed (timeout?)");
-            
+
             self.poseServer.set_succeeded()
             rospy.loginfo("Done.");
-            
+
         else:
             msg = "pose \""+goal.pose_name+"\" not in pose_manager's library";
             rospy.logwarn("%s", msg)
             self.poseServer.set_aborted(text=str);
-                           
+
 
 
 if __name__ == '__main__':
