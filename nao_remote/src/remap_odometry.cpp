@@ -109,7 +109,7 @@ private:
 
 OdometryRemap::OdometryRemap()
   : m_privateNh("~"), m_odomFrameId("odom"), m_baseFrameId("base_link"),
-    m_lfootFrameId("LFoot_link"), m_rfootFrameId("RFoot_link"),
+    m_lfootFrameId("l_sole"), m_rfootFrameId("r_sole"),
     m_imuTopic("torso_imu"), m_baseFootPrintID("base_footprint"),
     m_useIMUAngles(false), m_paused(false),
     m_lastOdomTime(0.0), m_lastWx(0.0), m_lastWy(0.0), m_lastWz(0.0),
