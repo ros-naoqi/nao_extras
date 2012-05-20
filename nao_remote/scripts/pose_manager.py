@@ -144,7 +144,7 @@ class PoseManager():
         else:
             msg = "pose \""+goal.pose_name+"\" not in pose_manager's library";
             rospy.logwarn("%s", msg)
-            self.poseServer.set_aborted(text=str);
+            self.poseServer.set_aborted(text=str(msg));
 
 
 
