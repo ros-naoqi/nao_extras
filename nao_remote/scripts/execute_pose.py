@@ -1,20 +1,13 @@
 #!/usr/bin/env python
 
-#!/usr/bin/env python
+# SVN $HeadURL$
+# SVN $Id$
 
-# SVN $HeadURL: https://alufr-ros-pkg.googlecode.com/svn/trunk/humanoid_stacks/humanoid_navigation/footstep_planner/scripts/plan_footsteps.py $
-# SVN $Id: plan_footsteps.py 1862 2011-08-29 16:29:14Z hornunga@informatik.uni-freiburg.de $
-
-#
-# A simple service client calling a running footstep_planner node.
-# Using this program you can request footstep plans from the command line.
+# A simple action client calling the pose_manager
 #
 # Author: Armin Hornung, University of Freiburg 
-#
-# This is program is part of the ROS footstep planner:
-# http://www.ros.org/wiki/footstep_planner
-# License: GPL 3
-#
+
+
 
 import roslib
 roslib.load_manifest('nao_remote')
