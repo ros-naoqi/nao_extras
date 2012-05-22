@@ -318,6 +318,7 @@ void OdometryRemap::jsCallback(const sensor_msgs::JointState::ConstPtr & ptr)
    ros::Time time = ptr->header.stamp;
    tf::StampedTransform tf_odom_to_base, tf_odom_to_left_foot, tf_odom_to_right_foot;
 
+   ROS_DEBUG("JointState callback function, computing frame %s", m_baseFootPrintID.c_str());
    try {
       m_listener.lookupTransform(m_odomFrameId, m_lfootFrameId, time, tf_odom_to_left_foot);
       m_listener.lookupTransform(m_odomFrameId, m_rfootFrameId, time, tf_odom_to_right_foot);
@@ -341,6 +342,7 @@ void OdometryRemap::jsCallback(const sensor_msgs::JointState::ConstPtr & ptr)
    // publish transform with parent m_baseFrameId and new child m_baseFootPrintID
    // i.e. transform from m_baseFrameId to m_baseFootPrintID
    m_brBaseFootPrint.sendTransform(tf::StampedTransform(tf_base_to_footprint, time, m_baseFrameId, m_baseFootPrintID));
+   ROS_DEBUG("Published Transform %s --> %s", m_baseFrameId.c_str(), m_baseFootPrintID.c_str());
 
    return;
 }

@@ -7,7 +7,7 @@
 
 <launch>
   <include file="$(find nao_description)/launch/nao_state_publisher.launch" />
-  <node pkg="nao_remote" type="remap_odometry" name="remap_odometry" />
+  <node pkg="nao_remote" type="remap_odometry" name="remap_odometry" output="screen"/>
   <node pkg="nao_remote" type="pose_manager.py" name="pose_manager">
     <rosparam file="$(find nao_remote)/config/basic_poses.yaml" command="load" ns="poses"/>
   </node>
