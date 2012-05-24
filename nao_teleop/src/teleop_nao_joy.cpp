@@ -32,16 +32,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <ros/ros.h>
-#include <std_msgs/String.h>
-#include <geometry_msgs/Twist.h>
-#include <std_srvs/Empty.h>
-#include <nao_msgs/JointAnglesWithSpeed.h>
-#include <nao_msgs/JointTrajectoryAction.h>
-#include <nao_msgs/BodyPoseAction.h>
-#include <nao_msgs/BodyPoseActionGoal.h>
-#include <nao_msgs/CmdVelService.h>
-#include <actionlib/client/simple_action_client.h>
+#include <nao_teleop/teleop_nao_joy.h>
 
 // switch between diamondback /electric:
 #if ROS_VERSION_MINIMUM(1,6,0)
@@ -52,65 +43,6 @@
   using joy::Joy;
 #endif
 
-/**
- * \brief Nao Teleoperation via Joystick.
- *
- * Subscribes to "joy" messages, and remaps them to Nao teleoperation commands.
- */
-class TeleopNaoJoy
-{
-   public:
-      TeleopNaoJoy();
-      void pubMsg();
-      ros::NodeHandle nh;
-      ros::NodeHandle privateNh;
-
-   private:
-      void joyCallback(const Joy::ConstPtr& joy);
-      bool inhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
-      bool uninhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
-      bool axisValid(int axis, const Joy::ConstPtr& joy) const;
-      bool buttonPressed(int button, const Joy::ConstPtr& joy) const;
-      bool buttonTriggered(int button, const Joy::ConstPtr& joy) const;
-      bool buttonChanged(int button, const Joy::ConstPtr& joy, const Joy::ConstPtr& prevJoy) const;
-
-      bool m_enabled;
-      int m_xAxis;
-      int m_yAxis;
-      int m_turnAxis;
-      int m_headYawAxis;
-      int m_headPitchAxis;
-      int m_crouchBtn;
-      int m_initPoseBtn;
-      int m_enableBtn;
-      int m_modifyHeadBtn;
-      int m_startScanBtn;
-      int m_stopScanBtn;
-      double m_maxVx;
-      double m_maxVy;
-      double m_maxVw;
-      double m_maxHeadYaw;
-      double m_maxHeadPitch;
-      ros::Duration m_bodyPoseTimeOut;
-      int m_inhibitCounter;
-
-      bool m_previousJoystick_initialized;
-      Joy::ConstPtr m_previousJoystick;
-
-      ros::Publisher m_movePub;
-      ros::Publisher m_moveBtnPub;
-      ros::Publisher m_headPub;
-      ros::Subscriber m_joySub;
-      ros::Publisher m_speechPub;
-      ros::ServiceServer m_inhibitWalkSrv;
-      ros::ServiceServer m_uninhibitWalkSrv;
-      ros::ServiceClient m_cmdVelClient;
-      ros::ServiceClient m_stiffnessDisableClient;
-      ros::ServiceClient m_stiffnessEnableClient;
-      actionlib::SimpleActionClient<nao_msgs::BodyPoseAction> m_bodyPoseClient;
-      geometry_msgs::Twist m_motion;
-      nao_msgs::JointAnglesWithSpeed m_headAngles;
-};
 
 TeleopNaoJoy::TeleopNaoJoy()
    :	privateNh("~"), m_enabled(false),
@@ -148,12 +80,12 @@ TeleopNaoJoy::TeleopNaoJoy()
    m_movePub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
    m_headPub = nh.advertise<nao_msgs::JointAnglesWithSpeed>("joint_angles", 1);
    m_speechPub = nh.advertise<std_msgs::String>("speech", 1);
-   m_joySub = nh.subscribe<Joy>("joy", 3, &TeleopNaoJoy::joyCallback, this);
    m_inhibitWalkSrv = nh.advertiseService("inhibit_walk", &TeleopNaoJoy::inhibitWalk, this);
    m_uninhibitWalkSrv = nh.advertiseService("uninhibit_walk", &TeleopNaoJoy::uninhibitWalk, this);
    m_cmdVelClient = nh.serviceClient<nao_msgs::CmdVelService>("cmd_vel_srv");
    m_stiffnessDisableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/disable");
    m_stiffnessEnableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/enable");
+
 
    if (!m_bodyPoseClient.waitForServer(ros::Duration(3.0))){
 	   ROS_WARN_STREAM("Could not connect to \"body_pose\" action server, "
@@ -163,23 +95,35 @@ TeleopNaoJoy::TeleopNaoJoy()
 
 }
 
+
+ros::Subscriber TeleopNaoJoy::subscribeToJoystick() {
+  return subscribeToJoystick(&TeleopNaoJoy::joyCallback, this);
+}
+
+
+void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
+  if(!m_previousJoystick_initialized) {
+    // if no previous joystick message has been received
+    // assume all buttons and axes have been zero
+    //
+    Joy::Ptr pJoy(new Joy());
+    pJoy->buttons.resize( joy->buttons.size(), 0);
+    pJoy->axes.resize( joy->axes.size(), 0.0);
+    m_previousJoystick = pJoy;
+    m_previousJoystick_initialized = true;
+  }
+  
+}
+
+
 /**
  * \brief Callback for joystick messages
  *
  * @param joy
  */
    void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
-      if(!m_previousJoystick_initialized)
-      {
-         // if no previous joystick message has been received
-         // assume all buttons and axes have been zero
-         //
-         Joy::Ptr pJoy(new Joy());
-         pJoy->buttons.resize( joy->buttons.size(), 0);
-         pJoy->axes.resize( joy->axes.size(), 0.0);
-         m_previousJoystick = pJoy;
-         m_previousJoystick_initialized = true;
-      }
+      initializePreviousJoystick(joy);
+
       // Buttons:
       // TODO: make buttons generally configurable by mapping btn_id => pose_string
       if (m_enabled && buttonTriggered(m_crouchBtn, joy) && m_bodyPoseClient.isServerConnected()){
@@ -263,7 +207,7 @@ TeleopNaoJoy::TeleopNaoJoy()
       }
       */
 
-      m_previousJoystick = joy;
+      setPreviousJoystick(joy);
 
    }
 
@@ -374,25 +318,5 @@ bool TeleopNaoJoy::uninhibitWalk(std_srvs::EmptyRequest &req, std_srvs::EmptyRes
       ROS_WARN("/uninhibit_walk called more times than /inhibit_walk - ignoring");
    }
    return true;
-}
-
-int main(int argc, char** argv)
-{
-   ros::init(argc, argv, "teleop_nao");
-   TeleopNaoJoy teleopNao;
-
-   // rate of publishing motion commands (too high stresses the Nao's CPU)
-   double publishRate = 10.0;
-   teleopNao.privateNh.param("motion_publish_rate", publishRate, publishRate);
-   ros::Rate pubRate(publishRate);
-
-   while(teleopNao.nh.ok()){
-      ros::spinOnce();
-
-      teleopNao.pubMsg();
-      pubRate.sleep();
-   }
-
-   return 0;
 }
 
