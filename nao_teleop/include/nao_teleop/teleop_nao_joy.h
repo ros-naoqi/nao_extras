@@ -46,13 +46,14 @@
 
 // switch between diamondback /electric:
 #if ROS_VERSION_MINIMUM(1,6,0)
-  #include <sensor_msgs/Joy.h>
-  using sensor_msgs::Joy;
+#include <sensor_msgs/Joy.h>
+using sensor_msgs::Joy;
 #else
-  #include <joy/Joy.h>
-  using joy::Joy;
+#include <joy/Joy.h>
+using joy::Joy;
 #endif
 
+namespace nao_teleop{
 /**
  * \brief Nao Teleoperation via Joystick. Ct
  *
@@ -60,84 +61,85 @@
  */
 class TeleopNaoJoy
 {
-   public:
-      TeleopNaoJoy();
-      void pubMsg();
-      ros::NodeHandle nh;
-      ros::NodeHandle privateNh;
+public:
+  TeleopNaoJoy();
+  void pubMsg();
+  ros::NodeHandle nh;
+  ros::NodeHandle privateNh;
 
-      /**
-       * \brief Subscribe to joystick using default hander (TeleopNaoJoy::joyCallback).
-       *
-       */
-      ros::Subscriber subscribeToJoystick();
+  /**
+   * \brief Subscribe to joystick using default hander (TeleopNaoJoy::joyCallback).
+   *
+   */
+  ros::Subscriber subscribeToJoystick();
 
 
- protected:
-      void joyCallback(const Joy::ConstPtr& joy);
-      bool buttonPressed(int button, const Joy::ConstPtr& joy) const;
-      bool buttonTriggered(int button, const Joy::ConstPtr& joy) const;
-      bool buttonChanged(int button, const Joy::ConstPtr& joy, const Joy::ConstPtr& prevJoy) const;
-      void initializePreviousJoystick(const Joy::ConstPtr& joy);
-      void setPreviousJoystick(const Joy::ConstPtr& joy) {
-	m_previousJoystick = joy;
-      }
-      bool m_enabled;
+protected:
+  void joyCallback(const Joy::ConstPtr& joy);
+  bool buttonPressed(int button, const Joy::ConstPtr& joy) const;
+  bool buttonTriggered(int button, const Joy::ConstPtr& joy) const;
+  bool buttonChanged(int button, const Joy::ConstPtr& joy, const Joy::ConstPtr& prevJoy) const;
+  void initializePreviousJoystick(const Joy::ConstPtr& joy);
+  void setPreviousJoystick(const Joy::ConstPtr& joy) {
+    m_previousJoystick = joy;
+  }
+  bool m_enabled;
 
-      
-      
-      /**
-       * \brief Subscribe to joystick using this callback function.
-       *
-       */
-      template<class M, class T>
-	ros::Subscriber subscribeToJoystick(void(T::*fp)(M), T* obj) {      
-	m_joySub = nh.subscribe<Joy>("joy", 3, fp,obj);
-	return m_joySub;
-      }
 
-      
 
-   private:
-      bool inhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
-      bool uninhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
-      bool axisValid(int axis, const Joy::ConstPtr& joy) const;
+  /**
+   * \brief Subscribe to joystick using this callback function.
+   *
+   */
+  template<class M, class T>
+  ros::Subscriber subscribeToJoystick(void(T::*fp)(M), T* obj) {
+    m_joySub = nh.subscribe<Joy>("joy", 3, fp,obj);
+    return m_joySub;
+  }
 
-      int m_xAxis;
-      int m_yAxis;
-      int m_turnAxis;
-      int m_headYawAxis;
-      int m_headPitchAxis;
-      int m_crouchBtn;
-      int m_initPoseBtn;
-      int m_enableBtn;
-      int m_modifyHeadBtn;
-      int m_startScanBtn;
-      int m_stopScanBtn;
-      double m_maxVx;
-      double m_maxVy;
-      double m_maxVw;
-      double m_maxHeadYaw;
-      double m_maxHeadPitch;
-      ros::Duration m_bodyPoseTimeOut;
-      int m_inhibitCounter;
 
-      bool m_previousJoystick_initialized;
-      Joy::ConstPtr m_previousJoystick;
 
-      ros::Publisher m_movePub;
-      ros::Publisher m_moveBtnPub;
-      ros::Publisher m_headPub;
-      ros::Subscriber m_joySub;
-      ros::Publisher m_speechPub;
-      ros::ServiceServer m_inhibitWalkSrv;
-      ros::ServiceServer m_uninhibitWalkSrv;
-      ros::ServiceClient m_cmdVelClient;
-      ros::ServiceClient m_stiffnessDisableClient;
-      ros::ServiceClient m_stiffnessEnableClient;
-      actionlib::SimpleActionClient<nao_msgs::BodyPoseAction> m_bodyPoseClient;
-      geometry_msgs::Twist m_motion;
-      nao_msgs::JointAnglesWithSpeed m_headAngles;
+private:
+  bool inhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
+  bool uninhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
+  bool axisValid(int axis, const Joy::ConstPtr& joy) const;
+
+  int m_xAxis;
+  int m_yAxis;
+  int m_turnAxis;
+  int m_headYawAxis;
+  int m_headPitchAxis;
+  int m_crouchBtn;
+  int m_initPoseBtn;
+  int m_enableBtn;
+  int m_modifyHeadBtn;
+  int m_startScanBtn;
+  int m_stopScanBtn;
+  double m_maxVx;
+  double m_maxVy;
+  double m_maxVw;
+  double m_maxHeadYaw;
+  double m_maxHeadPitch;
+  ros::Duration m_bodyPoseTimeOut;
+  int m_inhibitCounter;
+
+  bool m_previousJoystick_initialized;
+  Joy::ConstPtr m_previousJoystick;
+
+  ros::Publisher m_movePub;
+  ros::Publisher m_moveBtnPub;
+  ros::Publisher m_headPub;
+  ros::Subscriber m_joySub;
+  ros::Publisher m_speechPub;
+  ros::ServiceServer m_inhibitWalkSrv;
+  ros::ServiceServer m_uninhibitWalkSrv;
+  ros::ServiceClient m_cmdVelClient;
+  ros::ServiceClient m_stiffnessDisableClient;
+  ros::ServiceClient m_stiffnessEnableClient;
+  actionlib::SimpleActionClient<nao_msgs::BodyPoseAction> m_bodyPoseClient;
+  geometry_msgs::Twist m_motion;
+  nao_msgs::JointAnglesWithSpeed m_headAngles;
 };
+}
 
 #endif

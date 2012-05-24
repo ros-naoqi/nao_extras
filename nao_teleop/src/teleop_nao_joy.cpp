@@ -36,62 +36,62 @@
 
 // switch between diamondback /electric:
 #if ROS_VERSION_MINIMUM(1,6,0)
-  #include <sensor_msgs/Joy.h>
-  using sensor_msgs::Joy;
+#include <sensor_msgs/Joy.h>
+using sensor_msgs::Joy;
 #else
-  #include <joy/Joy.h>
-  using joy::Joy;
+#include <joy/Joy.h>
+using joy::Joy;
 #endif
 
-
+namespace nao_teleop{
 TeleopNaoJoy::TeleopNaoJoy()
-   :	privateNh("~"), m_enabled(false),
-   m_xAxis(3), m_yAxis(2), m_turnAxis(0), m_headYawAxis(4),	m_headPitchAxis(5),
-   m_crouchBtn(9), m_initPoseBtn(0), m_enableBtn(8), m_modifyHeadBtn(5),
-   m_maxVx(1.0), m_maxVy(1.0), m_maxVw(0.5),
-   m_maxHeadYaw(2.0943), m_maxHeadPitch(0.7853),
-   m_bodyPoseTimeOut(5.0),
-   m_inhibitCounter(0), m_previousJoystick_initialized(false),
-   m_bodyPoseClient("body_pose", true)
+: privateNh("~"), m_enabled(false),
+  m_xAxis(3), m_yAxis(2), m_turnAxis(0), m_headYawAxis(4),	m_headPitchAxis(5),
+  m_crouchBtn(9), m_initPoseBtn(0), m_enableBtn(8), m_modifyHeadBtn(5),
+  m_maxVx(1.0), m_maxVy(1.0), m_maxVw(0.5),
+  m_maxHeadYaw(2.0943), m_maxHeadPitch(0.7853),
+  m_bodyPoseTimeOut(5.0),
+  m_inhibitCounter(0), m_previousJoystick_initialized(false),
+  m_bodyPoseClient("body_pose", true)
 {
-   privateNh.param("axis_x", m_xAxis, m_xAxis);
-   privateNh.param("axis_y", m_yAxis, m_yAxis);
-   privateNh.param("axis_turn", m_turnAxis, m_turnAxis);
-   privateNh.param("axis_head_yaw", m_headYawAxis, m_headYawAxis);
-   privateNh.param("axis_head_pitch", m_headPitchAxis, m_headPitchAxis);
-   privateNh.param("btn_crouch", m_crouchBtn, m_crouchBtn);
-   privateNh.param("btn_init_pose", m_initPoseBtn, m_initPoseBtn);
-   privateNh.param("btn_enable_control", m_enableBtn, m_enableBtn);
-   privateNh.param("btn_head_mod", m_modifyHeadBtn, m_modifyHeadBtn);
-   privateNh.param("max_vx", m_maxVx, m_maxVx);
-   privateNh.param("max_vy", m_maxVy, m_maxVy);
-   privateNh.param("max_vw", m_maxVw, m_maxVw);
+  privateNh.param("axis_x", m_xAxis, m_xAxis);
+  privateNh.param("axis_y", m_yAxis, m_yAxis);
+  privateNh.param("axis_turn", m_turnAxis, m_turnAxis);
+  privateNh.param("axis_head_yaw", m_headYawAxis, m_headYawAxis);
+  privateNh.param("axis_head_pitch", m_headPitchAxis, m_headPitchAxis);
+  privateNh.param("btn_crouch", m_crouchBtn, m_crouchBtn);
+  privateNh.param("btn_init_pose", m_initPoseBtn, m_initPoseBtn);
+  privateNh.param("btn_enable_control", m_enableBtn, m_enableBtn);
+  privateNh.param("btn_head_mod", m_modifyHeadBtn, m_modifyHeadBtn);
+  privateNh.param("max_vx", m_maxVx, m_maxVx);
+  privateNh.param("max_vy", m_maxVy, m_maxVy);
+  privateNh.param("max_vw", m_maxVw, m_maxVw);
 
-   privateNh.param("max_head_yaw", m_maxHeadYaw, m_maxHeadYaw);
-   privateNh.param("max_head_pitch", m_maxHeadPitch, m_maxHeadPitch);
+  privateNh.param("max_head_yaw", m_maxHeadYaw, m_maxHeadYaw);
+  privateNh.param("max_head_pitch", m_maxHeadPitch, m_maxHeadPitch);
 
-   m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0;
-   m_headAngles.joint_names.push_back("HeadYaw");
-   m_headAngles.joint_names.push_back("HeadPitch");
-   m_headAngles.joint_angles.resize(2, 0.0f);
-   m_headAngles.relative = 0;
-   m_headAngles.speed = 0.2; // TODO: param
+  m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0;
+  m_headAngles.joint_names.push_back("HeadYaw");
+  m_headAngles.joint_names.push_back("HeadPitch");
+  m_headAngles.joint_angles.resize(2, 0.0f);
+  m_headAngles.relative = 0;
+  m_headAngles.speed = 0.2; // TODO: param
 
-   m_movePub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
-   m_headPub = nh.advertise<nao_msgs::JointAnglesWithSpeed>("joint_angles", 1);
-   m_speechPub = nh.advertise<std_msgs::String>("speech", 1);
-   m_inhibitWalkSrv = nh.advertiseService("inhibit_walk", &TeleopNaoJoy::inhibitWalk, this);
-   m_uninhibitWalkSrv = nh.advertiseService("uninhibit_walk", &TeleopNaoJoy::uninhibitWalk, this);
-   m_cmdVelClient = nh.serviceClient<nao_msgs::CmdVelService>("cmd_vel_srv");
-   m_stiffnessDisableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/disable");
-   m_stiffnessEnableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/enable");
+  m_movePub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
+  m_headPub = nh.advertise<nao_msgs::JointAnglesWithSpeed>("joint_angles", 1);
+  m_speechPub = nh.advertise<std_msgs::String>("speech", 1);
+  m_inhibitWalkSrv = nh.advertiseService("inhibit_walk", &TeleopNaoJoy::inhibitWalk, this);
+  m_uninhibitWalkSrv = nh.advertiseService("uninhibit_walk", &TeleopNaoJoy::uninhibitWalk, this);
+  m_cmdVelClient = nh.serviceClient<nao_msgs::CmdVelService>("cmd_vel_srv");
+  m_stiffnessDisableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/disable");
+  m_stiffnessEnableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/enable");
 
 
-   if (!m_bodyPoseClient.waitForServer(ros::Duration(3.0))){
-	   ROS_WARN_STREAM("Could not connect to \"body_pose\" action server, "
-			   << "there will be no body poses available on button presses.\n"
-			   << "Is the pose_manager node running?");
-   }
+  if (!m_bodyPoseClient.waitForServer(ros::Duration(3.0))){
+    ROS_WARN_STREAM("Could not connect to \"body_pose\" action server, "
+        << "there will be no body poses available on button presses.\n"
+        << "Is the pose_manager node running?");
+  }
 
 }
 
@@ -112,7 +112,7 @@ void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
     m_previousJoystick = pJoy;
     m_previousJoystick_initialized = true;
   }
-  
+
 }
 
 
@@ -121,80 +121,80 @@ void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
  *
  * @param joy
  */
-   void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
-      initializePreviousJoystick(joy);
+void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
+  initializePreviousJoystick(joy);
 
-      // Buttons:
-      // TODO: make buttons generally configurable by mapping btn_id => pose_string
-      if (m_enabled && buttonTriggered(m_crouchBtn, joy) && m_bodyPoseClient.isServerConnected()){
-    	 nao_msgs::BodyPoseGoal goal;
-    	 goal.pose_name = "crouch";
-         m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
-         actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
-         if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
-        	 ROS_ERROR("%s pose action did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
-         } else {
-        	 std_srvs::Empty e;
-        	 m_stiffnessDisableClient.call(e);
-         }
-         ROS_DEBUG("crouch btn action done");
-      }
+  // Buttons:
+  // TODO: make buttons generally configurable by mapping btn_id => pose_string
+  if (m_enabled && buttonTriggered(m_crouchBtn, joy) && m_bodyPoseClient.isServerConnected()){
+    nao_msgs::BodyPoseGoal goal;
+    goal.pose_name = "crouch";
+    m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
+    actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
+    if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
+      ROS_ERROR("%s pose action did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
+    } else {
+      std_srvs::Empty e;
+      m_stiffnessDisableClient.call(e);
+    }
+    ROS_DEBUG("crouch btn action done");
+  }
 
-      if (m_enabled && buttonTriggered(m_initPoseBtn, joy) && m_bodyPoseClient.isServerConnected()){
-    	 nao_msgs::BodyPoseGoal goal;
-    	 goal.pose_name = "init";
-    	 m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
-    	 actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
-    	 if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
-    		 ROS_ERROR("Pose action \"%s\" did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
-    	 } else{
-    		 ROS_INFO("Pose action \"%s\" succeeded", goal.pose_name.c_str());
-    	 }
-      }
+  if (m_enabled && buttonTriggered(m_initPoseBtn, joy) && m_bodyPoseClient.isServerConnected()){
+    nao_msgs::BodyPoseGoal goal;
+    goal.pose_name = "init";
+    m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
+    actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
+    if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
+      ROS_ERROR("Pose action \"%s\" did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
+    } else{
+      ROS_INFO("Pose action \"%s\" succeeded", goal.pose_name.c_str());
+    }
+  }
 
-      if (buttonTriggered(m_enableBtn, joy)){
-         std_msgs::String string;
-         if (m_enabled){
-            m_enabled = false;
-            string.data = "Gamepad control disabled";
+  if (buttonTriggered(m_enableBtn, joy)){
+    std_msgs::String string;
+    if (m_enabled){
+      m_enabled = false;
+      string.data = "Gamepad control disabled";
 
-         } else{
-            m_enabled = true;
-            string.data = "Gamepad control enabled";
-            std_srvs::Empty e;
-            m_stiffnessEnableClient.call(e);
-         }
-         m_speechPub.publish(string);
-         ROS_INFO("%s", (string.data).c_str());
+    } else{
+      m_enabled = true;
+      string.data = "Gamepad control enabled";
+      std_srvs::Empty e;
+      m_stiffnessEnableClient.call(e);
+    }
+    m_speechPub.publish(string);
+    ROS_INFO("%s", (string.data).c_str());
 
-      }
+  }
 
 
-      // directional commands
-      // walking velocities and head movements
-      if (!axisValid(m_xAxis, joy) ||  !axisValid(m_yAxis, joy) || !axisValid(m_turnAxis, joy)){
-         m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0;
-         m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
-         ROS_WARN("Joystick message too short for Move or Turn axis!\n");
-      } else{
-         if (buttonPressed(m_modifyHeadBtn, joy)){
-            // move head
-        	m_headAngles.header.stamp = ros::Time::now();
-            m_headAngles.relative = 1;
-            m_headAngles.joint_angles[0] = joy->axes[m_turnAxis];
-            m_headAngles.joint_angles[1] = joy->axes[m_xAxis];
+  // directional commands
+  // walking velocities and head movements
+  if (!axisValid(m_xAxis, joy) ||  !axisValid(m_yAxis, joy) || !axisValid(m_turnAxis, joy)){
+    m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0;
+    m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
+    ROS_WARN("Joystick message too short for Move or Turn axis!\n");
+  } else{
+    if (buttonPressed(m_modifyHeadBtn, joy)){
+      // move head
+      m_headAngles.header.stamp = ros::Time::now();
+      m_headAngles.relative = 1;
+      m_headAngles.joint_angles[0] = joy->axes[m_turnAxis];
+      m_headAngles.joint_angles[1] = joy->axes[m_xAxis];
 
-         } else {
-        	 // stop head:
-        	m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
-            // move base:
-            m_motion.linear.x = m_maxVx * std::max(std::min(joy->axes[m_xAxis], 1.0f), -1.0f);
-            m_motion.linear.y = m_maxVy * std::max(std::min(joy->axes[m_yAxis], 1.0f), -1.0f);
-            m_motion.angular.z = m_maxVw * std::max(std::min(joy->axes[m_turnAxis], 1.0f), -1.0f);
-         }
-      }
+    } else {
+      // stop head:
+      m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
+      // move base:
+      m_motion.linear.x = m_maxVx * std::max(std::min(joy->axes[m_xAxis], 1.0f), -1.0f);
+      m_motion.linear.y = m_maxVy * std::max(std::min(joy->axes[m_yAxis], 1.0f), -1.0f);
+      m_motion.angular.z = m_maxVw * std::max(std::min(joy->axes[m_turnAxis], 1.0f), -1.0f);
+    }
+  }
 
-      /*
+  /*
       // Head pos:
       if (!axisValid(m_headPitchAxis, joy) || !axisValid(m_headYawAxis, joy)){
       m_headAngles.absolute = 0;
@@ -205,11 +205,11 @@ void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
       m_headAngles.yaw = joy->axes[m_headYawAxis];
       m_headAngles.pitch = joy->axes[m_headPitchAxis];
       }
-      */
+   */
 
-      setPreviousJoystick(joy);
+  setPreviousJoystick(joy);
 
-   }
+}
 
 /**
  * \brief Returns true when a valid button is pressed
@@ -219,7 +219,7 @@ void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
  * @return
  */
 bool TeleopNaoJoy::buttonPressed(int button, const Joy::ConstPtr& joy) const{
-   return (button >= 0 && unsigned(button) < joy->buttons.size() && joy->buttons[button] == 1);
+  return (button >= 0 && unsigned(button) < joy->buttons.size() && joy->buttons[button] == 1);
 }
 
 /**
@@ -230,7 +230,7 @@ bool TeleopNaoJoy::buttonPressed(int button, const Joy::ConstPtr& joy) const{
  * @return
  */
 bool TeleopNaoJoy::buttonTriggered(int button, const Joy::ConstPtr& joy) const{
-   return (buttonPressed(button, joy) && buttonChanged(button, joy, m_previousJoystick));
+  return (buttonPressed(button, joy) && buttonChanged(button, joy, m_previousJoystick));
 }
 
 
@@ -245,7 +245,7 @@ bool TeleopNaoJoy::buttonTriggered(int button, const Joy::ConstPtr& joy) const{
  */
 
 bool TeleopNaoJoy::buttonChanged(int button, const Joy::ConstPtr& joy, const Joy::ConstPtr& prevJoy) const{
-   return (unsigned(button) < joy->buttons.size() && joy->buttons[button] != prevJoy->buttons[button] );
+  return (unsigned(button) < joy->buttons.size() && joy->buttons[button] != prevJoy->buttons[button] );
 }
 
 /**
@@ -256,17 +256,17 @@ bool TeleopNaoJoy::buttonChanged(int button, const Joy::ConstPtr& joy, const Joy
  * @return
  */
 bool TeleopNaoJoy::axisValid(int axis, const Joy::ConstPtr& joy) const{
-   return (axis >= 0 && unsigned(axis) < joy->buttons.size());
+  return (axis >= 0 && unsigned(axis) < joy->buttons.size());
 }
 
 /**
  * \brief Publish motion message to Nao
  */
 void TeleopNaoJoy::pubMsg(){
-   if (m_enabled && m_inhibitCounter == 0) {
-      m_movePub.publish(m_motion);
-      m_headPub.publish(m_headAngles);
-   }
+  if (m_enabled && m_inhibitCounter == 0) {
+    m_movePub.publish(m_motion);
+    m_headPub.publish(m_headAngles);
+  }
 }
 
 /**
@@ -282,21 +282,21 @@ void TeleopNaoJoy::pubMsg(){
  *
  */
 bool TeleopNaoJoy::inhibitWalk(std_srvs::EmptyRequest& /*req*/, std_srvs::EmptyResponse& res) {
-   if(m_inhibitCounter == 0) {
-      // not yet inhibited: publish zero walk command before inhibiting joystick
-      m_motion.linear.x = 0.0;
-      m_motion.linear.y = 0.0;
-      m_motion.linear.z = 0.0;
-      m_motion.angular.x = 0.0;
-      m_motion.angular.y = 0.0;
-      m_motion.angular.z = 0.0;
-      nao_msgs::CmdVelService service_call;
-      service_call.request.twist = m_motion;
-      m_cmdVelClient.call(service_call);
-   }
-   m_inhibitCounter++;
-   ROS_DEBUG("Inhibit counter: %d", m_inhibitCounter);
-   return true;
+  if(m_inhibitCounter == 0) {
+    // not yet inhibited: publish zero walk command before inhibiting joystick
+    m_motion.linear.x = 0.0;
+    m_motion.linear.y = 0.0;
+    m_motion.linear.z = 0.0;
+    m_motion.angular.x = 0.0;
+    m_motion.angular.y = 0.0;
+    m_motion.angular.z = 0.0;
+    nao_msgs::CmdVelService service_call;
+    service_call.request.twist = m_motion;
+    m_cmdVelClient.call(service_call);
+  }
+  m_inhibitCounter++;
+  ROS_DEBUG("Inhibit counter: %d", m_inhibitCounter);
+  return true;
 }
 
 /**
@@ -310,13 +310,14 @@ bool TeleopNaoJoy::inhibitWalk(std_srvs::EmptyRequest& /*req*/, std_srvs::EmptyR
  * the same number of times.
  */
 bool TeleopNaoJoy::uninhibitWalk(std_srvs::EmptyRequest &req, std_srvs::EmptyResponse& res) {
-   if(m_inhibitCounter > 0) {
-      m_inhibitCounter--;
-      ROS_DEBUG("Inhibit counter: %d", m_inhibitCounter);
-   } else {
-      m_inhibitCounter = 0;
-      ROS_WARN("/uninhibit_walk called more times than /inhibit_walk - ignoring");
-   }
-   return true;
+  if(m_inhibitCounter > 0) {
+    m_inhibitCounter--;
+    ROS_DEBUG("Inhibit counter: %d", m_inhibitCounter);
+  } else {
+    m_inhibitCounter = 0;
+    ROS_WARN("/uninhibit_walk called more times than /inhibit_walk - ignoring");
+  }
+  return true;
+}
 }
 

@@ -31,24 +31,25 @@
 
 #include <nao_teleop/teleop_nao_joy.h>
 
+using namespace nao_teleop;
 int main(int argc, char** argv)
 {
-   ros::init(argc, argv, "teleop_nao");
-   TeleopNaoJoy teleopNao;
-   teleopNao.subscribeToJoystick();
+  ros::init(argc, argv, "teleop_nao");
+  TeleopNaoJoy teleopNao;
+  teleopNao.subscribeToJoystick();
 
-   // rate of publishing motion commands (too high stresses the Nao's CPU)
-   double publishRate = 10.0;
-   teleopNao.privateNh.param("motion_publish_rate", publishRate, publishRate);
-   ros::Rate pubRate(publishRate);
+  // rate of publishing motion commands (too high stresses the Nao's CPU)
+  double publishRate = 10.0;
+  teleopNao.privateNh.param("motion_publish_rate", publishRate, publishRate);
+  ros::Rate pubRate(publishRate);
 
-   while(teleopNao.nh.ok()){
-      ros::spinOnce();
+  while(teleopNao.nh.ok()){
+    ros::spinOnce();
 
-      teleopNao.pubMsg();
-      pubRate.sleep();
-   }
+    teleopNao.pubMsg();
+    pubRate.sleep();
+  }
 
-   return 0;
+  return 0;
 }
 
