@@ -69,9 +69,14 @@ public:
 
   /**
    * \brief Subscribe to joystick using default hander (TeleopNaoJoy::joyCallback).
-   *
    */
   ros::Subscriber subscribeToJoystick();
+
+  /**
+   * \brief calls m_bodyPoseClient on the poseName, to execute a body pose
+   * @return success of actionlib call
+   */
+  bool callBodyPoseClient(const std::string& poseName);
 
 
 protected:
@@ -83,6 +88,7 @@ protected:
   void setPreviousJoystick(const Joy::ConstPtr& joy) {
     m_previousJoystick = joy;
   }
+
   bool m_enabled;
 
 
@@ -97,9 +103,6 @@ protected:
     return m_joySub;
   }
 
-
-
-private:
   bool inhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
   bool uninhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
   bool axisValid(int axis, const Joy::ConstPtr& joy) const;

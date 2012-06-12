@@ -4,7 +4,7 @@
 /*
  * Nao Joystick / Gamepad teleoperation
  *
- * Copyright 2009-2011 Armin Hornung, University of Freiburg
+ * Copyright 2009-2012 Armin Hornung, University of Freiburg
  * http://www.ros.org/wiki/nao
  *
  * Redistribution and use in source and binary forms, with or without
@@ -100,6 +100,25 @@ ros::Subscriber TeleopNaoJoy::subscribeToJoystick() {
   return subscribeToJoystick(&TeleopNaoJoy::joyCallback, this);
 }
 
+bool TeleopNaoJoy::callBodyPoseClient(const std::string& poseName){
+  if (!m_bodyPoseClient.isServerConnected()){
+    return false;
+  }
+
+  nao_msgs::BodyPoseGoal goal;
+  goal.pose_name = poseName;
+  m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
+  actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
+  if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
+    ROS_ERROR("Pose action \"%s\" did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
+    return false;
+  } else{
+    ROS_INFO("Pose action \"%s\" succeeded", goal.pose_name.c_str());
+    return true;
+  }
+
+}
+
 
 void TeleopNaoJoy::initializePreviousJoystick(const Joy::ConstPtr& joy) {
   if(!m_previousJoystick_initialized) {
@@ -126,30 +145,16 @@ void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
 
   // Buttons:
   // TODO: make buttons generally configurable by mapping btn_id => pose_string
+
   if (m_enabled && buttonTriggered(m_crouchBtn, joy) && m_bodyPoseClient.isServerConnected()){
-    nao_msgs::BodyPoseGoal goal;
-    goal.pose_name = "crouch";
-    m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
-    actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
-    if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
-      ROS_ERROR("%s pose action did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
-    } else {
+    if (callBodyPoseClient("crouch")){
       std_srvs::Empty e;
       m_stiffnessDisableClient.call(e);
     }
-    ROS_DEBUG("crouch btn action done");
   }
 
   if (m_enabled && buttonTriggered(m_initPoseBtn, joy) && m_bodyPoseClient.isServerConnected()){
-    nao_msgs::BodyPoseGoal goal;
-    goal.pose_name = "init";
-    m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
-    actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
-    if (state != actionlib::SimpleClientGoalState::SUCCEEDED){
-      ROS_ERROR("Pose action \"%s\" did not succeed (%s): %s", goal.pose_name.c_str(), state.toString().c_str(), state.text_.c_str());
-    } else{
-      ROS_INFO("Pose action \"%s\" succeeded", goal.pose_name.c_str());
-    }
+    callBodyPoseClient("init");
   }
 
   if (buttonTriggered(m_enableBtn, joy)){
