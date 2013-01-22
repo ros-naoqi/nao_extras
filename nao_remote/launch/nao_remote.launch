@@ -11,6 +11,7 @@
   <node pkg="nao_remote" type="pose_manager.py" name="pose_manager">
     <rosparam file="$(find nao_remote)/config/basic_poses.yaml" command="load" ns="poses"/>
   </node>
+  <node pkg="nao_remote" type="nao_imu_conversion.py" name="nao_imu_conversion"/>
   
 
 </launch>

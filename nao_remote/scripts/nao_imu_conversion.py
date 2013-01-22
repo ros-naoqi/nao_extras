@@ -47,7 +47,7 @@ from tf import transformations as tf
 pub = None
 
 def handleIMU(data):
-  rospy.loginfo("TorsoIMU received: %f %f", data.angleX, data.angleY)
+  rospy.logdebug("TorsoIMU received for conversion: %f %f", data.angleX, data.angleY)
   imu_msg = Imu()
   q = tf.quaternion_from_euler(data.angleX, data.angleY, 0.0)
   imu_msg.header = data.header
