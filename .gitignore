@@ -11,3 +11,16 @@
 *.lai
 *.la
 *.a
+
+# ROS stuff
+.cproject
+.project
+.pydevproject
+cmake_install.cmake
+build/
+bin/
+lib/
+msg_gen/
+srv_gen/
+
+nao_remote/src/nao_remote
