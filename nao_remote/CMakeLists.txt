@@ -1,31 +1,65 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(nao_remote)
 
-# Set the build type.  Options are:
-#  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
-#  Debug          : w/ debug symbols, w/o optimization
-#  Release        : w/o debug symbols, w/ optimization
-#  RelWithDebInfo : w/ debug symbols, w/ optimization
-#  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+# Declare main C++ dependencies
+set(ROS_CXX_DEPENDENCIES
+    roscpp
+    tf
+    std_msgs
+    std_srvs
+    geometry_msgs
+    nav_msgs
+    move_base_msgs
+    nao_msgs
+    message_filters
+    actionlib
+    angles)
 
-rosbuild_init()
+# Find catkin and all the required components
+find_package(catkin REQUIRED
+    COMPONENTS
+    message_generation
+    ${ROS_CXX_DEPENDENCIES} )
 
-#set the default path for built executables to the "bin" directory
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-#set the default path for built libraries to the "lib" directory
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+# Find Boost
+find_package(Boost REQUIRED COMPONENTS signals)
 
-#uncomment if you have defined messages
-#rosbuild_genmsg()
-#uncomment if you have defined services
-rosbuild_gensrv()
+# Set include and linking directories
+include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+link_directories(${catkin_LIBRARY_DIRS})
 
+# Generate services
+add_service_files(DIRECTORY srv FILES SetTransform.srv )
+generate_messages(DEPENDENCIES geometry_msgs)
 
+# Declare info that other packages need to import messages generated here
+catkin_package( CATKIN_DEPENDS message_runtime geometry_msgs )
 
-rosbuild_add_boost_directories()
+# Create target: remap_odometry 
+add_executable(remap_odometry src/remap_odometry.cpp)
+target_link_libraries(remap_odometry ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+add_dependencies(remap_odometry ${nao_remote_EXPORTED_TARGETS}) # Build srvs 1st
+add_dependencies(remap_odometry ${catkin_EXPORTED_TARGETS})
 
-rosbuild_add_executable(remap_odometry src/remap_odometry.cpp)
-rosbuild_link_boost(remap_odometry signals)
+# Create target: nao_path_follower
+add_executable(nao_path_follower src/nao_path_follower.cpp)
+target_link_libraries(nao_path_follower ${catkin_LIBRARIES})
+add_dependencies(nao_path_follower ${catkin_EXPORTED_TARGETS})
 
-rosbuild_add_executable(nao_path_follower src/nao_path_follower.cpp)
+# Installation rules for C++ targets
+install(TARGETS remap_odometry nao_path_follower
+    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION} )
+
+# Install python scripts
+install(DIRECTORY scripts/
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+    USE_SOURCE_PERMISSIONS )
+
+# Install launch files
+install(DIRECTORY launch/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch )
+
+# Install config files
+install(DIRECTORY config/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config)
+

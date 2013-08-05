@@ -1,0 +1,19 @@
+<package>
+  <name>nao_common</name>
+  <version>0.1.1</version>
+  
+  <description>
+    This stack contains common tools for the Nao robot to run remotely on the PC together with nao_robot on the robot. It provides joint state, odometry, and teleoperation with a gamepad.
+  </description>
+  
+  <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
+  <license>BSD</license>
+
+  <url>http://www.ros.org/wiki/nao_common</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  <export>
+    <metapackage/>
+  </export>
+
+</package>

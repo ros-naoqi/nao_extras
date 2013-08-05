@@ -1,0 +1,53 @@
+<package>
+  <name>nao_remote</name>
+  <version>0.1.1</version>
+  <description>
+    <p>
+     Remote control package for the Nao robot. Provides a node for Nao joystick teleoperation and odometry remapping into ROS format. The motion commands should be sent to a <a href="http://www.ros.org/wiki/nao_driver"> nao_driver</a> node, which in turn sends back robot state and odometry.     
+    </p>
+  </description>
+  <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
+  <license>BSD</license>
+
+  <url>http://ros.org/wiki/nao_remote</url>
+  <author>Armin Hornung</author>
+
+  
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>roscpp</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>move_base_msgs</build_depend>
+  <build_depend>nao_msgs</build_depend>
+  <build_depend>message_filters</build_depend>
+  <build_depend>actionlib</build_depend>
+  <build_depend>angles</build_depend>
+  <build_depend>boost</build_depend>
+  
+  <!--Same as build dependencies (message_generation->message_runtime) -->
+  <run_depend>roscpp</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>nav_msgs</run_depend>
+  <run_depend>move_base_msgs</run_depend>
+  <run_depend>nao_msgs</run_depend>
+  <run_depend>message_filters</run_depend>
+  <run_depend>actionlib</run_depend>
+  <run_depend>angles</run_depend>
+  <run_depend>boost</run_depend>
+  
+  <!-- New build dependencies (for python+launch files) -->
+  <run_depend>rospy</run_depend>
+  <run_depend>nao_driver</run_depend>
+  <run_depend>nao_description</run_depend>
+  <run_depend>nao_teleop</run_depend>
+
+</package>
