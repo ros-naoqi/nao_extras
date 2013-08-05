@@ -1,9 +1,4 @@
 #!/usr/bin/env python
-
-# SVN $HeadURL$
-# SVN $Id$
-
-
 #
 # ROS node to provide a few joint angle trajectories as default poses
 #
@@ -153,3 +148,4 @@ if __name__ == '__main__':
     manager = PoseManager()
     rospy.spin()
     exit(0)
+
