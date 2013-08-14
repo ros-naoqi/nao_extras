@@ -29,3 +29,4 @@ rosbuild_add_executable(remap_odometry src/remap_odometry.cpp)
 rosbuild_link_boost(remap_odometry signals)
 
 rosbuild_add_executable(nao_path_follower src/nao_path_follower.cpp)
+
