@@ -35,11 +35,12 @@ generate_messages(DEPENDENCIES geometry_msgs)
 # Declare info that other packages need to import messages generated here
 catkin_package( CATKIN_DEPENDS message_runtime geometry_msgs )
 
-# Create target: remap_odometry 
+# Create target: remap_odometry
 add_executable(remap_odometry src/remap_odometry.cpp)
 target_link_libraries(remap_odometry ${catkin_LIBRARIES} ${Boost_LIBRARIES})
-add_dependencies(remap_odometry ${nao_remote_EXPORTED_TARGETS}) # Build srvs 1st
-add_dependencies(remap_odometry ${catkin_EXPORTED_TARGETS})
+add_dependencies(remap_odometry
+    ${nao_remote_EXPORTED_TARGETS} # Build services first
+    ${catkin_EXPORTED_TARGETS} )
 
 # Create target: nao_path_follower
 add_executable(nao_path_follower src/nao_path_follower.cpp)
@@ -62,4 +63,3 @@ install(DIRECTORY launch/
 # Install config files
 install(DIRECTORY config/
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config)
-
