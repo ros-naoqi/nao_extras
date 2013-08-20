@@ -44,14 +44,9 @@
 #include <nao_msgs/CmdVelService.h>
 #include <actionlib/client/simple_action_client.h>
 
-// switch between diamondback /electric:
-#if ROS_VERSION_MINIMUM(1,6,0)
 #include <sensor_msgs/Joy.h>
 using sensor_msgs::Joy;
-#else
-#include <joy/Joy.h>
-using joy::Joy;
-#endif
+
 
 namespace nao_teleop{
 /**

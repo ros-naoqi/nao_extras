@@ -1,9 +1,4 @@
 #!/usr/bin/env python
-
-# SVN $HeadURL$
-# SVN $Id$
-
-
 #
 # ROS node to from nao's IMU message to a standard sensor_msgs IMU
 #
@@ -69,3 +64,4 @@ if __name__ == '__main__':
   
   rospy.spin()
   exit(0)
+

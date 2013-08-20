@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-# SVN $HeadURL$
-# SVN $Id$
-
 # A simple action client calling the pose_manager
 #
 # Author: Armin Hornung, University of Freiburg 
@@ -36,3 +33,4 @@ if __name__ == '__main__':
     poseClient.send_goal_and_wait(goal, rospy.Duration(5.0))
     #TODO: check for errors    
     exit(0)
+

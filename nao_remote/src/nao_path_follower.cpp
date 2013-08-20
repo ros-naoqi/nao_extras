@@ -1,6 +1,3 @@
-// SVN $HeadURL$
-// SVN $Id$
-
 /*
  *
  * Copyright 2011 Armin Hornung & Stefan Osswald, University of Freiburg
