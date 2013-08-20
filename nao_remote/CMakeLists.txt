@@ -36,11 +36,11 @@ generate_messages(DEPENDENCIES geometry_msgs)
 catkin_package( CATKIN_DEPENDS message_runtime geometry_msgs )
 
 # Create target: remap_odometry
-add_executable(remap_odometry src/remap_odometry.cpp)
-target_link_libraries(remap_odometry ${catkin_LIBRARIES} ${Boost_LIBRARIES})
-add_dependencies(remap_odometry
-    ${nao_remote_EXPORTED_TARGETS} # Build services first
-    ${catkin_EXPORTED_TARGETS} )
+#add_executable(remap_odometry src/remap_odometry.cpp)
+#target_link_libraries(remap_odometry ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+#add_dependencies(remap_odometry
+#    ${nao_remote_EXPORTED_TARGETS} # Build services first
+#    ${catkin_EXPORTED_TARGETS} )
 
 # Create target: nao_path_follower
 add_executable(nao_path_follower src/nao_path_follower.cpp)
@@ -48,7 +48,9 @@ target_link_libraries(nao_path_follower ${catkin_LIBRARIES})
 add_dependencies(nao_path_follower ${catkin_EXPORTED_TARGETS})
 
 # Installation rules for C++ targets
-install(TARGETS remap_odometry nao_path_follower
+install(TARGETS
+    #remap_odometry
+    nao_path_follower
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION} )
 
 # Install python scripts
