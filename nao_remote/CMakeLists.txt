@@ -16,18 +16,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-#uncomment if you have defined messages
-#rosbuild_genmsg()
-#uncomment if you have defined services
-rosbuild_gensrv()
-
-
-
 rosbuild_add_boost_directories()
-
-# will be removed, now implemented in nao_driver
-# rosbuild_add_executable(remap_odometry src/remap_odometry.cpp)
-# rosbuild_link_boost(remap_odometry signals)
 
 rosbuild_add_executable(nao_path_follower src/nao_path_follower.cpp)
 
