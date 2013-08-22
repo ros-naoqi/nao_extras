@@ -1,12 +1,13 @@
 <stack>
-  <description brief="Common tools for the Nao robot to run     remotely on the PC (tf, joint state, teleop)">This stack contains common tools for the Nao robot to run
-  remotely on the PC together with nao_robot on
-    the robot. It provides joint state, odometry, and teleoperation with a
-    gamepad.</description>
+  <description brief="Extra nodes for the Nao humanoid, e.g. teleop and path following">
+    This stack contains tools for the Nao robot (in addition to the nao_robot stack) to run
+  remotely on the PC. It provides teleoperation with a gamepad and path following. Renamed
+    from the nao_common stack.
+  </description>
   <author>Maintained by Armin Hornung</author>
   <license>BSD</license>  
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/nao_common</url>
+  <url>http://ros.org/wiki/nao_extras</url>
   <depend stack="common" /> <!-- actionlib -->
   <depend stack="common_msgs" /> <!-- nav_msgs, geometry_msgs -->
   <depend stack="geometry" /> <!-- tf, angles -->
