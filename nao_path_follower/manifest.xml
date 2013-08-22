@@ -1,17 +1,15 @@
 <package>
-  <description brief="Remote control package for the Nao humanoid robot.">
+  <description brief="Follow a 2D path closely or walk to a target location with Nao">
 	<p>
-     Remote control package for the Nao robot. 
-     Provides a node for Nao joystick teleoperation and odometry remapping into ROS format.
-     The motion commands should be sent to a <a href="http://www.ros.org/wiki/nao_driver">
-     nao_driver</a> node, which in turn sends back robot state and odometry.     
-    </p>
+  Enables a Nao humanoid to either walk to a target location (with localization feedback),
+  or follow a planned 3D path closely. Sends nao_msgs to the nao_walker node in nao_driver.     
+  </p>
 
   </description>
   <author>Armin Hornung</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
-  <url>http://ros.org/wiki/nao_remote</url>
+  <url>http://ros.org/wiki/nao_path_follower</url>
     
   <depend package="std_msgs"/>
   <depend package="nav_msgs"/>
