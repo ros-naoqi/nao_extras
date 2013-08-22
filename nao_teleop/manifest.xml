@@ -14,7 +14,6 @@
   <depend package="nav_msgs"/>
   <depend package="nao_msgs"/>
   <depend package="std_srvs"/>
-  <depend package="nao_remote"/>
 
   <export>
     <cpp cflags="-I${prefix}/include" lflags="-L${prefix}/lib -Wl,-rpath,-L${prefix}lib -lnao_teleop"/>
