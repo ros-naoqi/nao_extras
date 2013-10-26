@@ -1,9 +1,6 @@
-// SVN $HeadURL$
-// SVN $Id$
-
 /*
  *
- * Copyright 2011 Armin Hornung & Stefan Osswald, University of Freiburg
+ * Copyright 2011-2013 Armin Hornung & Stefan Osswald, University of Freiburg
  * http://www.ros.org/wiki/nao
  *
  * Redistribution and use in source and binary forms, with or without

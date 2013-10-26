@@ -44,14 +44,8 @@
 #include <nao_msgs/CmdVelService.h>
 #include <actionlib/client/simple_action_client.h>
 
-// switch between diamondback /electric:
-#if ROS_VERSION_MINIMUM(1,6,0)
 #include <sensor_msgs/Joy.h>
-using sensor_msgs::Joy;
-#else
-#include <joy/Joy.h>
-using joy::Joy;
-#endif
+
 
 namespace nao_teleop{
 /**
@@ -80,12 +74,12 @@ public:
 
 
 protected:
-  void joyCallback(const Joy::ConstPtr& joy);
-  bool buttonPressed(int button, const Joy::ConstPtr& joy) const;
-  bool buttonTriggered(int button, const Joy::ConstPtr& joy) const;
-  bool buttonChanged(int button, const Joy::ConstPtr& joy, const Joy::ConstPtr& prevJoy) const;
-  void initializePreviousJoystick(const Joy::ConstPtr& joy);
-  void setPreviousJoystick(const Joy::ConstPtr& joy) {
+  void joyCallback(const sensor_msgs::Joy::ConstPtr& joy);
+  bool buttonPressed(int button, const sensor_msgs::Joy::ConstPtr& joy) const;
+  bool buttonTriggered(int button, const sensor_msgs::Joy::ConstPtr& joy) const;
+  bool buttonChanged(int button, const sensor_msgs::Joy::ConstPtr& joy, const sensor_msgs::Joy::ConstPtr& prevJoy) const;
+  void initializePreviousJoystick(const sensor_msgs::Joy::ConstPtr& joy);
+  void setPreviousJoystick(const sensor_msgs::Joy::ConstPtr& joy) {
     m_previousJoystick = joy;
   }
 
@@ -99,13 +93,13 @@ protected:
    */
   template<class M, class T>
   ros::Subscriber subscribeToJoystick(void(T::*fp)(M), T* obj) {
-    m_joySub = nh.subscribe<Joy>("joy", 3, fp,obj);
+    m_joySub = nh.subscribe<sensor_msgs::Joy>("joy", 3, fp,obj);
     return m_joySub;
   }
 
   bool inhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
   bool uninhibitWalk(std_srvs::EmptyRequest& req, std_srvs::EmptyResponse& res);
-  bool axisValid(int axis, const Joy::ConstPtr& joy) const;
+  bool axisValid(int axis, const sensor_msgs::Joy::ConstPtr& joy) const;
 
   int m_xAxis;
   int m_yAxis;
@@ -127,7 +121,7 @@ protected:
   int m_inhibitCounter;
 
   bool m_previousJoystick_initialized;
-  Joy::ConstPtr m_previousJoystick;
+  sensor_msgs::Joy::ConstPtr m_previousJoystick;
 
   ros::Publisher m_movePub;
   ros::Publisher m_moveBtnPub;

@@ -1,6 +1,0 @@
-<!-- launches the necessary remote remapping nodes and teleoperation -->
-
-<launch>
-  <include file="$(find nao_remote)/launch/nao_remote.launch" />
-  <include file="$(find nao_teleop)/launch/teleop_joy.launch" />
-</launch>

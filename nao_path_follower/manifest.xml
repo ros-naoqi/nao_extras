@@ -1,0 +1,28 @@
+<package>
+  <description brief="Follow a 2D path closely or walk to a target location with Nao">
+	<p>
+  Enables a Nao humanoid to either walk to a target location (with localization feedback),
+  or follow a planned 3D path closely. Sends nao_msgs to the nao_walker node in nao_driver.     
+  </p>
+
+  </description>
+  <author>Armin Hornung</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/nao_path_follower</url>
+    
+  <depend package="std_msgs"/>
+  <depend package="nav_msgs"/>
+  <depend package="std_srvs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="tf"/>
+  <depend package="nao_msgs"/>
+  <depend package="move_base_msgs" />
+  <depend package="actionlib" />
+  <depend package="angles"/>
+
+</package>
+
+
