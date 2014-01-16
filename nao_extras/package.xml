@@ -1,0 +1,23 @@
+<package>
+  <name>nao_extras</name>
+  <version>0.1.0</version>
+  
+  <description>
+    Extra tools for the Nao robot: teleoperation with a gamepad and path following. Renamed
+    from the nao_common stack.
+  </description>
+  
+  <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
+  <license>BSD</license>
+
+  <url>http://www.ros.org/wiki/nao_extras</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  <export>
+    <metapackage/>
+  </export>
+
+ <run_depend>nao_path_follower</run_depend>
+ <run_depend>nao_teleop</run_depend>
+
+</package>
