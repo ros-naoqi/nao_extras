@@ -1,6 +1,6 @@
 <package>
   <name>nao_extras</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   
   <description>
     Extra tools for the Nao robot: teleoperation with a gamepad and path following. Renamed
@@ -11,6 +11,8 @@
   <license>BSD</license>
 
   <url>http://www.ros.org/wiki/nao_extras</url>
+  <url type="bugtracker">https://github.com/ros-nao/nao_extras/issues</url>
+  <url type="repository">https://github.com/ros-nao/nao_extras</url>
   
   <buildtool_depend>catkin</buildtool_depend>
   <export>
