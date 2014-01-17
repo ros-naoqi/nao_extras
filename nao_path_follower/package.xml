@@ -1,0 +1,43 @@
+<package>
+  <name>nao_path_follower</name>
+  <version>0.2.0</version>
+  <description>
+  Enables a Nao humanoid to either walk to a target location (with localization feedback),
+  or follow a planned 3D path closely. Sends nao_msgs to the nao_walker node in nao_driver.     
+  </description>
+  
+  <author>Armin Hornung</author>
+  <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
+  <license>BSD</license>
+
+  <url>http://ros.org/wiki/nao_path_follower</url>
+  <url type="bugtracker">https://github.com/ros-nao/nao_extras/issues</url>
+  <url type="repository">https://github.com/ros-nao/nao_extras</url> 
+
+  <buildtool_depend>catkin</buildtool_depend>
+    
+  <build_depend>std_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>nao_msgs</build_depend>
+  <build_depend>move_base_msgs</build_depend>
+  <build_depend>actionlib</build_depend>
+  <build_depend>angles</build_depend>
+
+  <run_depend>std_msgs</run_depend>
+  <run_depend>nav_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>tf</run_depend>
+  <run_depend>nao_msgs</run_depend>
+  <run_depend>move_base_msgs</run_depend>
+  <run_depend>actionlib</run_depend>
+  <run_depend>angles</run_depend>
+
+</package>
+
+
