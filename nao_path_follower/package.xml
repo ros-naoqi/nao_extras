@@ -3,10 +3,12 @@
   <version>0.2.0</version>
   <description>
   Enables a Nao humanoid to either walk to a target location (with localization feedback),
-  or follow a planned 3D path closely. Sends nao_msgs to the nao_walker node in nao_driver.     
+  or follow a planned 2D path closely. Sends nao_msgs to the nao_walker node in nao_driver.
   </description>
   
   <author>Armin Hornung</author>
+  <author>Stefan Osswald</author>
+  <author>Daniel Maier</author>
   <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
   <license>BSD</license>
 
