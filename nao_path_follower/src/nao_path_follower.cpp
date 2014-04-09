@@ -1,6 +1,7 @@
 /*
  *
- * Copyright 2011-2013 Armin Hornung & Stefan Osswald, University of Freiburg
+ * Copyright 2011-2014 Armin Hornung, Stefan Osswald, Daniel Maier
+ * University of Freiburg
  * http://www.ros.org/wiki/nao
  *
  * Redistribution and use in source and binary forms, with or without
@@ -127,19 +128,11 @@ PathFollower::PathFollower()
 	privateNh.param("use_foot_contact_protection", m_useFootContactProtection, m_useFootContactProtection);
 	privateNh.param("path_next_target_distance", m_pathNextTargetDistance, m_pathNextTargetDistance);
 	privateNh.param("threshold_damp_xy", m_thresholdDampXY, m_thresholdDampXY);
-        ROS_INFO("Param controller_frequency: %f",m_controllerFreq);
-        ROS_INFO("Param target_distance_threshold: %f",m_targetDistThres);
-        ROS_INFO("Param target_angle_threshold: %f",m_targetAngThres);
-        ROS_INFO("Param max_vel_x: %f, max_vel_y: %f, max_vel_yaw: %f",m_maxVelFractionX,m_maxVelFractionY,m_maxVelFractionYaw);
-        ROS_INFO("Param step_freq: %f",m_stepFreq);
-        ROS_INFO("Param use_vel_ctrl: %d",m_useVelocityController);
-        ROS_INFO("Param use_foot_contact_protection: %d",m_useFootContactProtection);
 
 	m_stepFactor = ((m_maxStepFreq - m_minStepFreq) * m_stepFreq + m_minStepFreq) / m_maxStepFreq;
         ROS_INFO("Using step factor of %4.2f",m_stepFactor);
 
 	if(m_useVelocityController) {
-	    ROS_WARN("Velocity controller is not working yet!");
 	    ROS_INFO("Using velocity controller");
 	    m_velPub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
 	} else {
@@ -634,7 +627,6 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
       // TODO: Use other thresholds for target != endOfPath
       else if ( relTarget.getOrigin().length()< robot_start_path_threshold && std::abs(yaw) < 45*M_PI/180.0)
       {
-         ROS_INFO("Advancing targetPose..");
          // update currentPathPoseIt to point to waypoint corresponding to  targetPose
          currentPathPoseIt = targetPathPoseIt;
          // update targetPose, targetPathPoseIt
