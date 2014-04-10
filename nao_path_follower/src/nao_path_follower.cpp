@@ -255,22 +255,6 @@ double getYawBetween(const tf::Transform & p1, const tf::Transform & p2)
 }
 tf::Quaternion getOrientationBetween(const tf::Transform & p1, const tf::Transform & p2)
 {
-   /*
-   tf::Quaternion q;
-   tf::Transform t1 = p1;
-   t1.setRotation(tf::createQuaternionFromYaw(0.0));
-   tf::Transform t2 = p2;
-   t2.setRotation(tf::createQuaternionFromYaw(0.0));
-   print_transform(t1);
-   print_transform(t2);
-   std::cout << std::endl;
-
-   tf::Transform relTarget = t1.inverseTimes(t2);
-   print_transform(relTarget);
-   std::cout << std::endl;
-   relTarget.getBasis().getRPY(roll, pitch, yaw);
-   */
-   //ROS_INFO("Computed yaw %f ",  yaw);
    double yaw = getYawBetween(p1, p2);
    return (tf::createQuaternionFromYaw(yaw));
 }
@@ -298,7 +282,7 @@ double moveAlongPathByDistance( const PathIterator & start, PathIterator & end, 
 }
 
 // this function assumes that robotPose is close (< robot_start_path_threshold) to *currentPathPoseIt 
-bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt)
+bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt)
 {  
 
    // current state in  path unclear: cannot go further, end of path reached
@@ -310,15 +294,23 @@ bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & r
    }
 
    
-   // 0 successors possible from currentPathPoseIt
+   // no successors in path: last pose or only one pose in path
    if( currentPathPoseIt+1 == path.poses.end() )
    {
-      // this can happen, if we are close to the final goal or someone send us a single goal wrapped as path (not allowed)
-      // under first assumption it we just keep the current targetPose
-      ROS_INFO("Goal almost reached! Keeping targetPose. ");
+      // this can happen, if we are close to the final goal or the path only has one pose
+      // => just keep targetPose until reached
+      ROS_DEBUG("Goal almost reached! Keeping targetPose. ");
+
+      // ensure that the orientation is valid
+      if (!hasOrientation(targetPathPoseIt->pose)){
+        // best guess: current rotation
+        targetPose.setRotation(robotPose.getRotation());
+      }
       return true;
    }
-   // from here, currentPathPoseIt has at least one successor
+
+   // TODO: check if successor exists, otherwise go to target pose with orientation
+   // or ignore orientation if there is none (take current)
 
    // rewrite
    std::vector< geometry_msgs::PoseStamped>::const_iterator iter = currentPathPoseIt+1;
@@ -345,19 +337,13 @@ bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & r
    tf::poseStampedMsgToTF(*iter, targetPose);
    
 
-   // check if poses have orientation
+   // if no orientation, then compute from  waypoint
    if ( !hasOrientation (iter->pose) )
    {
-      //ROS_WARN("Target has no orientation. Computing orientation from other waypoints.");
 
       tf::Quaternion orientation;
-      if( iter==currentPathPoseIt ) // path has only one element so get orientation from robot to poses[0]
-      {
-         ROS_ERROR("This case should never happend (anymore)");
-         orientation = getOrientationBetween( robotPose, targetPose);
-         assert(0); // produce seg fault // TODO: To remove this later
-      }
-      else if (targetIsEndOfPath) // path length >= 2 and iter points to end of path
+      assert(iter != currentPathPoseIt);
+      if (targetIsEndOfPath) // path length >= 2 and iter points to end of path
       {
          tf::Stamped<tf::Transform> prevPose;
          tf::poseStampedMsgToTF( *(iter-1), prevPose );
@@ -449,13 +435,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
       m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(),"Stop succeeed");
       return;
    }
-   if(path.poses.size()==1)
-   {
-      ROS_INFO("Sending a single goal is not supported (use walk_target instead).");
-      stopWalk();
-      m_walkPathServer.setAborted(nao_msgs::FollowPathResult(),"Single goal stop");
-      return;
-   }
+
    ros::Rate r(m_controllerFreq);
 
    ros::Time lastTfSuccessTime = ros::Time::now();
@@ -483,10 +463,13 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
    // Check if start of path is consistent with current robot pose, otherwise abort
    std::vector< geometry_msgs::PoseStamped>::const_iterator currentPathPoseIt, targetPathPoseIt;
    currentPathPoseIt = path.poses.begin();
-   tf::Stamped<tf::Transform> tmp;
-   tf::poseStampedMsgToTF( *currentPathPoseIt, tmp);
+   targetPathPoseIt = currentPathPoseIt;
+   // This is where Nao is currently walking to (current sub goal)
+   tf::Stamped<tf::Transform> targetPose;
+   
+   tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
    double robot_start_path_threshold = 0.05; // TODO: Param
-   if (distance(tmp, globalToBase)> robot_start_path_threshold )
+   if (distance(targetPose, globalToBase)> robot_start_path_threshold )
    {
       ROS_ERROR("Robot is too far away from start of plan. aborting");
       stopWalk();
@@ -495,8 +478,6 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
    }
 
 
-   // This is where Nao is currently walking to (current sub goal)
-   tf::Stamped<tf::Transform> targetPose;
    bool targetIsEndOfPath = getNextTarget(path, globalToBase, currentPathPoseIt, targetPose, targetPathPoseIt );
    publishTargetPoseVis(targetPose);
    if(!m_isJoystickInhibited) {
@@ -547,21 +528,11 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
                m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(),"Stop succeeed");
                return;
             }
-            /*
-            if(path.poses.size()==1)
-            {
-               ROS_INFO("Sending a single goal is not supported (use walk_target instead).");
-               stopWalk();
-               m_walkPathServer.setAborted(nao_msgs::FollowPathResult(),"Single goal stop");
-               return;
-            }
-            */
 
             // Check if start of path is consistent with current robot pose, otherwise abort
             currentPathPoseIt = path.poses.begin();
-            tf::Stamped<tf::Transform> tmp;
-            tf::poseStampedMsgToTF( *currentPathPoseIt, tmp);
-            if (distance(tmp, globalToBase)> robot_start_path_threshold )
+            tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
+            if (distance(targetPose, globalToBase)> robot_start_path_threshold )
             {
                ROS_ERROR("Robot is too far away from start of plan. aborting");
                stopWalk();
