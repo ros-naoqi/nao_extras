@@ -57,11 +57,12 @@ public:
         bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
 
 private:
-        bool getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt);
+  bool getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt);
 	void stopWalk();
 	void setVelocity(const tf::Transform& relTarget);
 	void publishTargetPoseVis(const tf::Stamped<tf::Pose>& targetPose);
 	void footContactCallback(const std_msgs::BoolConstPtr& contact);
+  void inhibitJoystick();
 
 	ros::NodeHandle nh;
 	ros::NodeHandle privateNh;
@@ -75,8 +76,10 @@ private:
 
 	std::string m_baseFrameId;     ///< Base frame of the robot.
 	double m_controllerFreq;       ///< Desired frequency for controller loop.
-	double m_targetDistThres;      ///< Maximum linear deviation from target point.
-	double m_targetAngThres;       ///< Maximum angular deviation from target orientation.
+	double m_targetDistThres;      ///< Maximum linear deviation to reach target point.
+	double m_targetAngThres;       ///< Maximum angular deviation to reach target orientation.
+	double m_waypointDistThres;    ///< Maximum linear deviation to switch to next waypoint on path
+	double m_waypointAngThres;     ///< Maximum angular deviation to switch to next waypoint on path
 	bool m_isJoystickInhibited;    ///< True = joystick walk commands are inhibited.
 	bool m_useFootContactProtection;  ///< True = abort walk when robot is lifted off the ground
 	bool m_footContact;            ///< True = robot currently has foot contact with the ground.
@@ -97,7 +100,8 @@ private:
 	double m_thresholdDampXY;      ///< Slow down when distance to goal is smaller than this value [in meters].
 	double m_thresholdDampYaw;     ///< Slow down rotation when angular deviation from goal pose is smaller than this value [in radians].
         // for path following
-	double m_pathNextTargetDistance;     ///< Cumulative Distance to next Velocity Target from current robot pose along path
+	double m_pathNextTargetDistance; ///< Cumulative Distance to next Velocity Target from current robot pose along path
+	double m_pathStartMaxDistance;   ///< Max distance to start of path from robot pose to accept path (safety)
 };
 
 PathFollower::PathFollower()
@@ -106,13 +110,15 @@ PathFollower::PathFollower()
     m_walkPathServer(nh, "walk_path", boost::bind(&PathFollower::pathActionCB, this, _1), false),
     m_baseFrameId("base_footprint"), m_controllerFreq(10),
     m_targetDistThres(0.05), m_targetAngThres(angles::from_degrees(5.)),
+    m_waypointDistThres(0.05), m_waypointAngThres(angles::from_degrees(45)),
     m_isJoystickInhibited(false), 
     m_useFootContactProtection(true), m_footContact(true),
     m_useVelocityController(false),
     m_maxVelFractionX(0.7), m_maxVelFractionY(0.7), m_maxVelFractionYaw(0.7), m_stepFreq(0.5),
     m_maxVelXY(0.0952), m_maxVelYaw(angles::from_degrees(47.6)), m_minStepFreq(1.667), m_maxStepFreq(2.381),    
     m_thresholdFar(0.20), m_thresholdRotate(angles::from_degrees(45.)),
-    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(30.)), m_pathNextTargetDistance(0.1)
+    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(30.)), m_pathNextTargetDistance(0.1),
+    m_pathStartMaxDistance(0.1)
 {
 
 	privateNh.param("base_frame_id", m_baseFrameId, m_baseFrameId);
@@ -120,6 +126,8 @@ PathFollower::PathFollower()
 	privateNh.param("controller_frequency", m_controllerFreq, m_controllerFreq);
 	privateNh.param("target_distance_threshold", m_targetDistThres, m_targetDistThres);
 	privateNh.param("target_angle_threshold", m_targetAngThres, m_targetAngThres);
+  privateNh.param("waypoint_distance_threshold", m_waypointDistThres, m_waypointDistThres);
+  privateNh.param("waypoint_angle_threshold", m_waypointAngThres, m_waypointAngThres);
 	privateNh.param("max_vel_x", m_maxVelFractionX, m_maxVelFractionX);
 	privateNh.param("max_vel_y", m_maxVelFractionY, m_maxVelFractionY);
 	privateNh.param("max_vel_yaw", m_maxVelFractionYaw, m_maxVelFractionYaw);
@@ -127,6 +135,7 @@ PathFollower::PathFollower()
 	privateNh.param("use_vel_ctrl", m_useVelocityController, m_useVelocityController);
 	privateNh.param("use_foot_contact_protection", m_useFootContactProtection, m_useFootContactProtection);
 	privateNh.param("path_next_target_distance", m_pathNextTargetDistance, m_pathNextTargetDistance);
+  privateNh.param("path_max_start_distance", m_pathStartMaxDistance, m_pathStartMaxDistance);
 	privateNh.param("threshold_damp_xy", m_thresholdDampXY, m_thresholdDampXY);
 
 	m_stepFactor = ((m_maxStepFreq - m_minStepFreq) * m_stepFreq + m_minStepFreq) / m_maxStepFreq;
@@ -198,7 +207,19 @@ void PathFollower::pathCB(const nav_msgs::PathConstPtr& goal) {
 }
 
 void PathFollower::footContactCallback(const std_msgs::BoolConstPtr& contact) {
-    m_footContact = contact->data;
+  m_footContact = contact->data;
+}
+
+void PathFollower::inhibitJoystick(){
+  if(!m_isJoystickInhibited) {
+    std_srvs::Empty e;
+    if(m_inhibitWalkClient.call(e)) {
+      ROS_INFO("Joystick inhibited");
+      m_isJoystickInhibited = true;
+    } else {
+      ROS_WARN_ONCE("Could not inhibit joystick walk");
+    }
+  }  
 }
 
 
@@ -468,8 +489,8 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
    tf::Stamped<tf::Transform> targetPose;
    
    tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
-   double robot_start_path_threshold = 0.05; // TODO: Param
-   if (distance(targetPose, globalToBase)> robot_start_path_threshold )
+
+   if (distance(targetPose, globalToBase)> m_pathStartMaxDistance)
    {
       ROS_ERROR("Robot is too far away from start of plan. aborting");
       stopWalk();
@@ -480,15 +501,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
    bool targetIsEndOfPath = getNextTarget(path, globalToBase, currentPathPoseIt, targetPose, targetPathPoseIt );
    publishTargetPoseVis(targetPose);
-   if(!m_isJoystickInhibited) {
-      std_srvs::Empty e;
-      if(m_inhibitWalkClient.call(e)) {
-         ROS_INFO("Joystick inhibited");
-         m_isJoystickInhibited = true;
-      } else {
-         ROS_WARN("Could not inhibit joystick walk");
-      }
-   }
+   inhibitJoystick();
    
    while(ros::ok()){
       if (! getRobotPose(globalToBase, global_frame_id) )
@@ -532,7 +545,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
             // Check if start of path is consistent with current robot pose, otherwise abort
             currentPathPoseIt = path.poses.begin();
             tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
-            if (distance(targetPose, globalToBase)> robot_start_path_threshold )
+            if (distance(targetPose, globalToBase)> m_pathStartMaxDistance )
             {
                ROS_ERROR("Robot is too far away from start of plan. aborting");
                stopWalk();
@@ -543,15 +556,8 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
             // set targetPose, this will not change until we reached it
             targetIsEndOfPath = getNextTarget(path, globalToBase, currentPathPoseIt, targetPose, targetPathPoseIt );
             publishTargetPoseVis(targetPose);
-            if(!m_isJoystickInhibited) {
-               std_srvs::Empty e;
-               if(m_inhibitWalkClient.call(e)) {
-                  ROS_INFO("Joystick inhibited");
-                  m_isJoystickInhibited = true;
-               } else {
-                  ROS_WARN("Could not inhibit joystick walk");
-               }
-            }
+            inhibitJoystick();
+            
          } else {
             ROS_INFO("walk_path ActionServer preempted");
             // anything to cleanup?e)
@@ -569,7 +575,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          return;
       }
 
-
+      // TODO: publish feedback
       /*
          move_base_msgs::MoveBaseFeedback feedback;
          feedback.base_position.header.stamp = globalToBase.stamp_;
@@ -585,8 +591,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
 
       // treat last targetPose different from other waypoints on path
-      if (targetIsEndOfPath && relTarget.getOrigin().length()< m_targetDistThres && std::abs(yaw) < m_targetAngThres)
-      {
+      if (targetIsEndOfPath && relTarget.getOrigin().length()< m_targetDistThres && std::abs(yaw) < m_targetAngThres){
          ROS_INFO("Target (%f %f %F) reached", targetPose.getOrigin().x(), targetPose.getOrigin().y(),
                tf::getYaw(targetPose.getRotation()));
 
@@ -594,10 +599,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
          m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(), "Target reached");
          return;
-      }
-      // TODO: Use other thresholds for target != endOfPath
-      else if ( relTarget.getOrigin().length()< robot_start_path_threshold && std::abs(yaw) < 45*M_PI/180.0)
-      {
+      } else if (!targetIsEndOfPath && relTarget.getOrigin().length()< m_waypointDistThres && std::abs(yaw) < m_waypointAngThres){
          // update currentPathPoseIt to point to waypoint corresponding to  targetPose
          currentPathPoseIt = targetPathPoseIt;
          // update targetPose, targetPathPoseIt
@@ -623,7 +625,6 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
          m_targetPub.publish(target);
       }
-
 
       r.sleep();
       //make sure to sleep for the remainder of our cycle time
@@ -651,16 +652,7 @@ void PathFollower::goalActionCB(const move_base_msgs::MoveBaseGoalConstPtr &goal
 	publishTargetPoseVis(targetPose);
 
 	ros::Rate r(m_controllerFreq);
-
-    if(!m_isJoystickInhibited) {
-        std_srvs::Empty e;
-        if(m_inhibitWalkClient.call(e)) {
-            ROS_INFO("Joystick inhibited");
-            m_isJoystickInhibited = true;
-        } else {
-            ROS_WARN("Could not inhibit joystick walk");
-        }
-    }
+  inhibitJoystick();
 
 
 	while(nh.ok()){
@@ -670,18 +662,11 @@ void PathFollower::goalActionCB(const move_base_msgs::MoveBaseGoalConstPtr &goal
 				move_base_msgs::MoveBaseGoal newGoal = *m_walkGoalServer.acceptNewGoal();
 				tf::poseStampedMsgToTF(newGoal.target_pose, targetPose);
 				publishTargetPoseVis(targetPose);
-				if(!m_isJoystickInhibited) {
-				    std_srvs::Empty e;
-					if(m_inhibitWalkClient.call(e)) {
-					    ROS_INFO("Joystick inhibited");
-						m_isJoystickInhibited = true;
-					} else {
-						ROS_WARN("Could not inhibit joystick walk");
-					}
-				}
+        inhibitJoystick();
+        
 			} else {
 				ROS_INFO("walk_target ActionServer preempted");
-				// anything to cleanup?e)
+				// anything to cleanup?
 				stopWalk();
 
 				m_walkGoalServer.setPreempted();
