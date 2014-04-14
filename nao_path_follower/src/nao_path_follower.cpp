@@ -372,64 +372,17 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
       }
       else // iter has at least one succesor
       {
-         // set Orientation so that successor of targetPose are faced
-         /*
-         ++iter;
-         tf::poseStampedMsgToTF( *iter, tfPose );
-         dist = distance( targetPose, tfPose );
-         while(iter+1 != path.poses.end() )
-         {
-            tf::poseStampedMsgToTF(*(iter), tfPose);
-            tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-            double d = distance( tfPose, tfPose2);
-            if (dist + d > targetDistance )
-               break;
-            dist += d;
-            ++iter;
-         }
-         ROS_INFO("Found successor at %4.2f, %4.2f", tfPose.getOrigin().x(), tfPose.getOrigin().y());
-         */
-         //std::vector< tf::Stamped<tf::Transform> > poses;
-         /*
-         iter = targetPathPoseIt;
-         double cumDist = 0.0;
-         double sinSum = 0.0;
-         double cosSum = 0.0;
-         // first add robot orientation
-         double yaw = getYawBetween( robotPose, targetPose); 
-         sinSum += std::sin(yaw);
-         cosSum += std::cos(yaw);
-         ROS_INFO("Found target at %4.2f, %4.2f, %4.2f", targetPose.getOrigin().x(), targetPose.getOrigin().y(), yaw*180.0/M_PI);
-         for(int i =0; i < 2 ; ++i )
-         {
-            PathIterator end = path.poses.end();
-            cumDist += moveAlongPathByDistance( iter, end, targetDistance);
-            tf::poseStampedMsgToTF(*(iter), tfPose2);
-            tf::poseStampedMsgToTF(*(end), tfPose);
-            double yaw = getYawBetween( tfPose2, tfPose); 
-            sinSum += std::sin(yaw);
-            cosSum += std::cos(yaw);
-            //poses.push_back(tfPose);
-            iter = end;
-            ROS_INFO("Found successor at %4.2f, %4.2f, %4.2f", tfPose.getOrigin().x(), tfPose.getOrigin().y(), yaw*180.0/M_PI);
-            if( iter+1 == path.poses.end() )
-               break;
-         }
-         yaw = std::atan2( sinSum, cosSum );
-         */
+         // set Orientation so that successor of targetPose is faced
          tf::poseStampedMsgToTF(*(targetPathPoseIt+1), tfPose2 );
-         double oldyaw = getYawBetween( targetPose, tfPose2);
-         double yaw = oldyaw;
-         if (targetPathPoseIt-1 != path.poses.begin() && targetPathPoseIt + 2 != path.poses.end() )
-         {
-
+         
+         double yaw =  getYawBetween( targetPose, tfPose2);
+         if (targetPathPoseIt-1 != path.poses.begin() && targetPathPoseIt + 2 != path.poses.end() ){
             tf::poseStampedMsgToTF(*(targetPathPoseIt-2), tfPose);
             tf::poseStampedMsgToTF(*(targetPathPoseIt+2), tfPose2 );
             double yaw1 = getYawBetween(tfPose, targetPose);
             double yaw2 = getYawBetween(targetPose, tfPose2);
             yaw = atan2( sin(yaw1)+sin(yaw2), cos(yaw1) + cos(yaw2) );
          }
-         ROS_INFO("Using yaw %4.2f instead of %4.2f (old method)", yaw*180.0/M_PI, oldyaw*180.0/M_PI);
          orientation = tf::createQuaternionFromYaw(yaw);
 
 
@@ -560,7 +513,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
             
          } else {
             ROS_INFO("walk_path ActionServer preempted");
-            // anything to cleanup?e)
+            // anything to cleanup?
             stopWalk();
 
             m_walkPathServer.setPreempted();
