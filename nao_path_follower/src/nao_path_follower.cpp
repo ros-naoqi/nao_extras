@@ -339,13 +339,12 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
    tf::poseStampedMsgToTF( *iter, tfPose);
    double dist = distance( robotPose, tfPose);
    bool targetIsEndOfPath = true;
-   double targetDistance = m_pathNextTargetDistance; // target at most x cm ahead of robot
    while(iter+1 != path.poses.end() )
    {
       tf::poseStampedMsgToTF(*iter, tfPose);
       tf::poseStampedMsgToTF(*(iter+1), tfPose2);
       double d = distance( tfPose, tfPose2);
-      if (dist + d > targetDistance )
+      if (dist + d > m_pathNextTargetDistance )
       {
          targetIsEndOfPath = false;
          break;
@@ -561,20 +560,16 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          // update relTarget
          relTarget = globalToBase.inverseTimes(targetPose);
       }
+      
 
       // walk to targetPose (relTarget)
       if(m_useVelocityController) {
          setVelocity(relTarget);
       } else {
          geometry_msgs::Pose2D target;
-         // workaround for NaoQI API (stay on the straight line connection facing towards goal)
-         if (relTarget.getOrigin().length() > 0.2){
-            relTarget.setOrigin(0.2* relTarget.getOrigin().normalized());
-            yaw = atan2(relTarget.getOrigin().y(), relTarget.getOrigin().x());
-         }
          target.x = relTarget.getOrigin().x();
          target.y = relTarget.getOrigin().y();
-         target.theta = yaw;
+         target.theta = tf::getYaw(relTarget.getRotation());
 
          m_targetPub.publish(target);
       }
