@@ -102,6 +102,12 @@ private:
         // for path following
 	double m_pathNextTargetDistance; ///< Cumulative Distance to next Velocity Target from current robot pose along path
 	double m_pathStartMaxDistance;   ///< Max distance to start of path from robot pose to accept path (safety)
+	double m_straightMaxRobotDev;	  ///< Maximum XY deviation of the robot off a straight until it is not recognized as such anymore
+	double m_straightMaxRobotYaw;	  ///< Maximum angle of the robot off a straight until it is not recognized as such anymore
+	double m_straightMaxPathDev;	  ///< Maximum angle deviation of the path off a straight (i.e. a curve in the path) until it is not recognized as such anymore
+	double m_straightThreshold;	  ///< Minimum length of a straigth that is to be recognized as such
+	double m_straightOffset;	///< Length of the targetPose offset if a straight is recognized
+	bool m_straight;		///< True = robot has a straight path in front of it with minimum length m_straightThreshold
 };
 
 PathFollower::PathFollower()
@@ -118,7 +124,9 @@ PathFollower::PathFollower()
     m_maxVelXY(0.0952), m_maxVelYaw(angles::from_degrees(47.6)), m_minStepFreq(1.667), m_maxStepFreq(2.381),    
     m_thresholdFar(0.20), m_thresholdRotate(angles::from_degrees(45.)),
     m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(30.)), m_pathNextTargetDistance(0.1),
-    m_pathStartMaxDistance(0.1)
+    m_pathStartMaxDistance(0.1),
+    m_straightMaxRobotDev(0.1), m_straightMaxRobotYaw(0.25), m_straightMaxPathDev(0.1),
+    m_straightThreshold(0.2), m_straightOffset(0.3), m_straight(false)
 {
 
 	privateNh.param("base_frame_id", m_baseFrameId, m_baseFrameId);
@@ -137,6 +145,12 @@ PathFollower::PathFollower()
 	privateNh.param("path_next_target_distance", m_pathNextTargetDistance, m_pathNextTargetDistance);
   privateNh.param("path_max_start_distance", m_pathStartMaxDistance, m_pathStartMaxDistance);
 	privateNh.param("threshold_damp_xy", m_thresholdDampXY, m_thresholdDampXY);
+	
+	privateNh.param("straight_max_robot_dev", m_straightMaxRobotDev, m_straightMaxRobotDev);
+	privateNh.param("straight_max_robot_yaw", m_straightMaxRobotYaw, m_straightMaxRobotYaw);
+	privateNh.param("straight_max_path_dev", m_straightMaxPathDev, m_straightMaxPathDev);
+	privateNh.param("straight_threshold", m_straightThreshold, m_straightThreshold);
+	privateNh.param("straight_offset", m_straightOffset, m_straightOffset);
 
 	m_stepFactor = ((m_maxStepFreq - m_minStepFreq) * m_stepFreq + m_minStepFreq) / m_maxStepFreq;
         ROS_INFO("Using step factor of %4.2f",m_stepFactor);
@@ -333,6 +347,49 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
    // TODO: check if successor exists, otherwise go to target pose with orientation
    // or ignore orientation if there is none (take current)
 
+
+   
+   // Check if the robot encounters a straight line in the path, where it can walk faster.
+   // The straight/remaining path has to have a minimum length of m_straightThreshold.
+   m_straight = false;
+   std::vector< geometry_msgs::PoseStamped>::const_iterator farIter = currentPathPoseIt;
+   tf::Stamped<tf::Transform> currentPose, nearPose, farPose, iterPose;
+   tf::poseStampedMsgToTF(*(currentPathPoseIt), currentPose);
+   double straightDist = 0.0;
+   bool nearEnd = true;
+   while(farIter+1 != path.poses.end()){
+     tf::poseStampedMsgToTF(*farIter, farPose);
+     tf::poseStampedMsgToTF(*(farIter+1), iterPose);
+     if(straightDist <= m_straightThreshold/4)
+       tf::poseStampedMsgToTF(*farIter, nearPose);
+     straightDist += distance(farPose, iterPose);
+     if(straightDist > m_straightThreshold){
+       nearEnd = false;
+       break;
+     }
+     ++farIter;
+   }
+   // actually check if the path is straight, if the robot is within a certain distance of the straight, and if the robot faces the straight
+   if(!nearEnd){
+     double robotYaw = tf::getYaw(robotPose.getRotation());
+     double robotToFar = getYawBetween(robotPose, farPose);
+     double currentToNear = getYawBetween(currentPose, nearPose);
+     double currentToFar = getYawBetween(currentPose, farPose);
+     bool robot_on_straight = (distance(robotPose, currentPose) < m_straightMaxRobotDev);
+     bool path_is_straight = (fabs(currentToNear-currentToFar) < m_straightMaxPathDev);
+     bool robot_faces_straight = (fabs(robotYaw-robotToFar) < m_straightMaxRobotYaw);
+//      if(!robot_on_straight)
+//        ROS_ERROR("robot_on_straight");
+//      if(!path_is_straight)
+//        ROS_ERROR("path_is_straight");
+//      if(!robot_faces_straight)
+//        ROS_ERROR("robot_faces_straight");
+     m_straight = (robot_on_straight && path_is_straight && robot_faces_straight);
+     if(m_straight)
+       ROS_DEBUG("Robot is walking on a straight.");
+   }
+   
+   
    // rewrite
    std::vector< geometry_msgs::PoseStamped>::const_iterator iter = currentPathPoseIt+1;
    tf::Stamped<tf::Transform> tfPose, tfPose2;
@@ -401,6 +458,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
    nav_msgs::Path path = goal->path;
    nao_msgs::FollowPathFeedback feedback;
+   
    if( path.poses.empty() )
    {
       ROS_INFO("Stop requested by sending empty path.");
@@ -563,13 +621,32 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
       
 
       // walk to targetPose (relTarget)
+      // if the robot is walking on a straight line, set the target point further ahead (by m_straightOffset)
+      tf::Transform relTargetStraight = relTarget;
+      if(m_straight){
+	std::vector< geometry_msgs::PoseStamped>::const_iterator targetIter = currentPathPoseIt;
+	tf::Stamped<tf::Transform> targetPose, iterPose;
+	double straightDist = 0.0;
+	while(targetIter+1 != path.poses.end()){
+	  tf::poseStampedMsgToTF(*targetIter, targetPose);
+	  tf::poseStampedMsgToTF(*(targetIter+1), iterPose);
+	  straightDist += distance(targetPose, iterPose);
+	  if(straightDist > m_straightOffset)
+	    break;
+	  ++targetIter;
+	}
+	tf::Stamped<tf::Transform> straightTargetPose;
+	tf::poseStampedMsgToTF(*targetIter, straightTargetPose);
+	relTargetStraight = globalToBase.inverseTimes(straightTargetPose);
+	relTargetStraight.setRotation(relTarget.getRotation());
+      }
       if(m_useVelocityController) {
-         setVelocity(relTarget);
+         setVelocity(relTargetStraight);
       } else {
          geometry_msgs::Pose2D target;
-         target.x = relTarget.getOrigin().x();
-         target.y = relTarget.getOrigin().y();
-         target.theta = tf::getYaw(relTarget.getRotation());
+         target.x = relTargetStraight.getOrigin().x();
+         target.y = relTargetStraight.getOrigin().y();
+         target.theta = tf::getYaw(relTargetStraight.getRotation());
 
          m_targetPub.publish(target);
       }
@@ -755,7 +832,7 @@ distance            | angle               | strategy
 void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	double dx, dy, yaw;
 	bool rotateOnSpot;
-    const double dist = relTarget.getOrigin().length();
+        const double dist = relTarget.getOrigin().length();
 	if(dist > m_thresholdFar) {
 	    // Far away: Orient towards the target point
 	    yaw = atan2(relTarget.getOrigin().y(), relTarget.getOrigin().x());
@@ -763,15 +840,15 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	} else {
 	    // Near: Orient towards the final angle
 	    yaw = tf::getYaw(relTarget.getRotation());
-        rotateOnSpot = (dist < m_targetDistThres);
-        if(dist < m_targetDistThres && std::abs(yaw) < m_targetAngThres) {
-            geometry_msgs::Twist twist;
-            twist.linear.x = 0.0;
-            twist.linear.y = 0.0;
-            twist.angular.z = 0.0;
-            m_velPub.publish(twist);
-            return;
-        }
+            rotateOnSpot = (std::abs(yaw) > m_thresholdRotate);
+            if(dist < m_targetDistThres && std::abs(yaw) < m_targetAngThres) {
+	        geometry_msgs::Twist twist;
+	        twist.linear.x = 0.0;
+	        twist.linear.y = 0.0;
+	        twist.angular.z = 0.0;
+                m_velPub.publish(twist);
+                return;
+            }
 	}
 
 	// Normalize angle between -180° and +180°
@@ -789,7 +866,7 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	    dy = relTarget.getOrigin().y();
 	}
 
-    const double times[] = {
+        const double times[] = {
         std::abs(dx)  / ((dampXY * m_maxVelFractionX)    * m_maxVelXY  * m_stepFactor),
         std::abs(dy)  / ((dampXY * m_maxVelFractionY)    * m_maxVelXY  * m_stepFactor),
         std::abs(yaw) / ((dampYaw * m_maxVelFractionYaw) * m_maxVelYaw * m_stepFactor),
