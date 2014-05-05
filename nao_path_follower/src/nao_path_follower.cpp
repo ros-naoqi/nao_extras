@@ -123,7 +123,7 @@ PathFollower::PathFollower()
     m_maxVelFractionX(0.7), m_maxVelFractionY(0.7), m_maxVelFractionYaw(0.7), m_stepFreq(0.5),
     m_maxVelXY(0.0952), m_maxVelYaw(angles::from_degrees(47.6)), m_minStepFreq(1.667), m_maxStepFreq(2.381),    
     m_thresholdFar(0.20), m_thresholdRotate(angles::from_degrees(45.)),
-    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(30.)), m_pathNextTargetDistance(0.1),
+    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(60.)), m_pathNextTargetDistance(0.1),
     m_pathStartMaxDistance(0.1),
     m_straightMaxRobotDev(0.1), m_straightMaxRobotYaw(0.25), m_straightMaxPathDev(0.1),
     m_straightThreshold(0.2), m_straightOffset(0.3), m_straight(false)
@@ -271,9 +271,17 @@ bool PathFollower::getRobotPose( tf::StampedTransform & globalToBase, const std:
    return true;
 }
 
-double distance (const tf::Pose & p1, const tf::Pose & p2)
+double poseDist(const tf::Pose& p1, const tf::Pose& p2)
 {
-   return (p1.getOrigin() - p2.getOrigin()).length();
+  return (p1.getOrigin() - p2.getOrigin()).length();
+}
+
+double poseDist(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2){
+  tf::Vector3 p1_tf, p2_tf;
+  tf::pointMsgToTF(p1.position, p1_tf);
+  tf::pointMsgToTF(p2.position, p2_tf);
+
+  return (p1_tf - p2_tf).length();
 }
 
 void print_transform(const tf::Transform & t)
@@ -282,16 +290,31 @@ void print_transform(const tf::Transform & t)
    tf::poseTFToMsg(t, m);
    std::cout << m;
 }
-double getYawBetween(const tf::Transform & p1, const tf::Transform & p2)
-{
-   tf::Vector3 o1 = p1.getOrigin();
-   tf::Vector3 o2 = p2.getOrigin();
-   return  std::atan2( o2.getY() - o1.getY(), o2.getX() - o1.getX());
+
+double getYawBetween(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2){
+   tf::Vector3 o1, o2;
+   tf::pointMsgToTF(p1.position, o1);
+   tf::pointMsgToTF(p2.position, o2);
+
+   return  std::atan2(o2.getY() - o1.getY(), o2.getX() - o1.getX());
 }
+
+double getYawBetween(const tf::Transform & p1, const tf::Transform & p2){
+  tf::Vector3 o1 = p1.getOrigin();
+  tf::Vector3 o2 = p2.getOrigin();
+  return  std::atan2( o2.getY() - o1.getY(), o2.getX() - o1.getX());
+}
+
 tf::Quaternion getOrientationBetween(const tf::Transform & p1, const tf::Transform & p2)
 {
    double yaw = getYawBetween(p1, p2);
    return (tf::createQuaternionFromYaw(yaw));
+}
+
+tf::Quaternion getOrientationBetween(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2)
+{
+  double yaw = getYawBetween(p1, p2);
+  return (tf::createQuaternionFromYaw(yaw));
 }
 
 
@@ -300,13 +323,10 @@ typedef std::vector< geometry_msgs::PoseStamped>::const_iterator PathIterator;
 double moveAlongPathByDistance( const PathIterator & start, PathIterator & end, double targetDistance)
 {
    PathIterator iter = start;
-   tf::Stamped<tf::Transform> tfPose, tfPose2;
    double dist = 0.0;
-   while(iter+1 != end )
-   {
-      tf::poseStampedMsgToTF(*(iter), tfPose);
-      tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-      double d = distance( tfPose, tfPose2);
+   while(iter+1 != end ){
+
+      double d = poseDist(iter->pose, (iter+1)->pose);
       if (dist + d > targetDistance )
          break;
       dist += d;
@@ -318,7 +338,7 @@ double moveAlongPathByDistance( const PathIterator & start, PathIterator & end, 
 
 // this function assumes that robotPose is close (< robot_start_path_threshold) to *currentPathPoseIt 
 bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt)
-{  
+{
 
    // current state in  path unclear: cannot go further, end of path reached
    if( path.poses.empty() || currentPathPoseIt == path.poses.end() ) // past-the-end of path
@@ -353,16 +373,15 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
    // The straight/remaining path has to have a minimum length of m_straightThreshold.
    m_straight = false;
    std::vector< geometry_msgs::PoseStamped>::const_iterator farIter = currentPathPoseIt;
-   tf::Stamped<tf::Transform> currentPose, nearPose, farPose, iterPose;
+   tf::Stamped<tf::Transform> currentPose, nearPose, farPose;
    tf::poseStampedMsgToTF(*(currentPathPoseIt), currentPose);
    double straightDist = 0.0;
    bool nearEnd = true;
    while(farIter+1 != path.poses.end()){
      tf::poseStampedMsgToTF(*farIter, farPose);
-     tf::poseStampedMsgToTF(*(farIter+1), iterPose);
      if(straightDist <= m_straightThreshold/4)
        tf::poseStampedMsgToTF(*farIter, nearPose);
-     straightDist += distance(farPose, iterPose);
+     straightDist += poseDist(farIter->pose, (farIter+1)->pose);
      if(straightDist > m_straightThreshold){
        nearEnd = false;
        break;
@@ -375,32 +394,27 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
      double robotToFar = getYawBetween(robotPose, farPose);
      double currentToNear = getYawBetween(currentPose, nearPose);
      double currentToFar = getYawBetween(currentPose, farPose);
-     bool robot_on_straight = (distance(robotPose, currentPose) < m_straightMaxRobotDev);
-     bool path_is_straight = (fabs(currentToNear-currentToFar) < m_straightMaxPathDev);
-     bool robot_faces_straight = (fabs(robotYaw-robotToFar) < m_straightMaxRobotYaw);
-//      if(!robot_on_straight)
-//        ROS_ERROR("robot_on_straight");
-//      if(!path_is_straight)
-//        ROS_ERROR("path_is_straight");
-//      if(!robot_faces_straight)
-//        ROS_ERROR("robot_faces_straight");
+     bool robot_on_straight = (poseDist(robotPose, currentPose) < m_straightMaxRobotDev);
+     bool path_is_straight = std::abs(angles::shortest_angular_distance(currentToNear,currentToFar)) < m_straightMaxPathDev;
+     bool robot_faces_straight = std::abs(angles::shortest_angular_distance(robotYaw,robotToFar)) < m_straightMaxRobotYaw;
+
      m_straight = (robot_on_straight && path_is_straight && robot_faces_straight);
+     //ROS_DEBUG_STREAM("Straight path: " << robot_on_straight << " " << path_is_straight << " " << robot_faces_straight);
      if(m_straight)
-       ROS_DEBUG("Robot is walking on a straight.");
+       ROS_DEBUG("Robot is walking on a straight path.");
+
    }
    
    
    // rewrite
    std::vector< geometry_msgs::PoseStamped>::const_iterator iter = currentPathPoseIt+1;
-   tf::Stamped<tf::Transform> tfPose, tfPose2;
+   tf::Stamped<tf::Transform> tfPose;
    tf::poseStampedMsgToTF( *iter, tfPose);
-   double dist = distance( robotPose, tfPose);
+   double dist = poseDist( robotPose, tfPose);
    bool targetIsEndOfPath = true;
    while(iter+1 != path.poses.end() )
    {
-      tf::poseStampedMsgToTF(*iter, tfPose);
-      tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-      double d = distance( tfPose, tfPose2);
+      double d = poseDist(iter->pose, (iter+1)->pose);
       if (dist + d > m_pathNextTargetDistance )
       {
          targetIsEndOfPath = false;
@@ -422,22 +436,16 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
       assert(iter != currentPathPoseIt);
       if (targetIsEndOfPath) // path length >= 2 and iter points to end of path
       {
-         tf::Stamped<tf::Transform> prevPose;
-         tf::poseStampedMsgToTF( *(iter-1), prevPose );
-         orientation = getOrientationBetween( prevPose, targetPose);
+        orientation = getOrientationBetween( (iter-1)->pose, targetPathPoseIt->pose);
       }
       else // iter has at least one succesor
       {
-         // set Orientation so that successor of targetPose is faced
-         tf::poseStampedMsgToTF(*(targetPathPoseIt+1), tfPose2 );
-         
-         double yaw =  getYawBetween( targetPose, tfPose2);
+         // set Orientation so that successor of targetPose is faced        
+         double yaw =  getYawBetween(targetPathPoseIt->pose, (targetPathPoseIt+1)->pose);
          if (targetPathPoseIt-1 != path.poses.begin() && targetPathPoseIt + 2 != path.poses.end() ){
-            tf::poseStampedMsgToTF(*(targetPathPoseIt-2), tfPose);
-            tf::poseStampedMsgToTF(*(targetPathPoseIt+2), tfPose2 );
-            double yaw1 = getYawBetween(tfPose, targetPose);
-            double yaw2 = getYawBetween(targetPose, tfPose2);
-            yaw = atan2( sin(yaw1)+sin(yaw2), cos(yaw1) + cos(yaw2) );
+           double yaw1 = getYawBetween((targetPathPoseIt-2)->pose, targetPathPoseIt->pose);
+           double yaw2 = getYawBetween(targetPathPoseIt->pose, (targetPathPoseIt+2)->pose);
+           yaw = atan2( sin(yaw1)+sin(yaw2), cos(yaw1) + cos(yaw2) );
          }
          orientation = tf::createQuaternionFromYaw(yaw);
 
@@ -500,7 +508,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
    
    tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
 
-   if (distance(targetPose, globalToBase)> m_pathStartMaxDistance)
+   if (poseDist(targetPose, globalToBase)> m_pathStartMaxDistance)
    {
       ROS_ERROR("Robot is too far away from start of plan. aborting");
       stopWalk();
@@ -555,7 +563,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
             // Check if start of path is consistent with current robot pose, otherwise abort
             currentPathPoseIt = path.poses.begin();
             tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
-            if (distance(targetPose, globalToBase)> m_pathStartMaxDistance )
+            if (poseDist(targetPose, globalToBase)> m_pathStartMaxDistance )
             {
                ROS_ERROR("Robot is too far away from start of plan. aborting");
                stopWalk();
@@ -624,21 +632,21 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
       // if the robot is walking on a straight line, set the target point further ahead (by m_straightOffset)
       tf::Transform relTargetStraight = relTarget;
       if(m_straight){
-	std::vector< geometry_msgs::PoseStamped>::const_iterator targetIter = currentPathPoseIt;
-	tf::Stamped<tf::Transform> targetPose, iterPose;
-	double straightDist = 0.0;
-	while(targetIter+1 != path.poses.end()){
-	  tf::poseStampedMsgToTF(*targetIter, targetPose);
-	  tf::poseStampedMsgToTF(*(targetIter+1), iterPose);
-	  straightDist += distance(targetPose, iterPose);
-	  if(straightDist > m_straightOffset)
-	    break;
-	  ++targetIter;
-	}
-	tf::Stamped<tf::Transform> straightTargetPose;
-	tf::poseStampedMsgToTF(*targetIter, straightTargetPose);
-	relTargetStraight = globalToBase.inverseTimes(straightTargetPose);
-	relTargetStraight.setRotation(relTarget.getRotation());
+        std::vector< geometry_msgs::PoseStamped>::const_iterator targetIter = currentPathPoseIt;
+        tf::Stamped<tf::Transform> targetPose, iterPose;
+        double straightDist = 0.0;
+        while(targetIter+1 != path.poses.end()){
+          tf::poseStampedMsgToTF(*targetIter, targetPose);
+          tf::poseStampedMsgToTF(*(targetIter+1), iterPose);
+          straightDist += poseDist(targetPose, iterPose);
+          if(straightDist > m_straightOffset)
+            break;
+          ++targetIter;
+        }
+        tf::Stamped<tf::Transform> straightTargetPose;
+        tf::poseStampedMsgToTF(*targetIter, straightTargetPose);
+        relTargetStraight = globalToBase.inverseTimes(straightTargetPose);
+        relTargetStraight.setRotation(relTarget.getRotation());
       }
       if(m_useVelocityController) {
          setVelocity(relTargetStraight);
