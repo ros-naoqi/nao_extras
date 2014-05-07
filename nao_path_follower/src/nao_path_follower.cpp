@@ -145,6 +145,7 @@ PathFollower::PathFollower()
 	privateNh.param("path_next_target_distance", m_pathNextTargetDistance, m_pathNextTargetDistance);
   privateNh.param("path_max_start_distance", m_pathStartMaxDistance, m_pathStartMaxDistance);
 	privateNh.param("threshold_damp_xy", m_thresholdDampXY, m_thresholdDampXY);
+  privateNh.param("threshold_damp_yaw", m_thresholdDampYaw, m_thresholdDampYaw);
 	
 	privateNh.param("straight_max_robot_dev", m_straightMaxRobotDev, m_straightMaxRobotDev);
 	privateNh.param("straight_max_robot_yaw", m_straightMaxRobotYaw, m_straightMaxRobotYaw);
