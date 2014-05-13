@@ -21,5 +21,6 @@
 
  <run_depend>nao_path_follower</run_depend>
  <run_depend>nao_teleop</run_depend>
+ <run_depend>nao_interaction</run_depend>
 
 </package>
