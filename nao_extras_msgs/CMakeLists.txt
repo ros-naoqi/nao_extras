@@ -17,17 +17,10 @@ find_package(catkin REQUIRED
     ${MESSAGE_DEPENDENCIES} )
 
 #Add message files
-add_message_files(DIRECTORY msg/nao_face_detection
+add_message_files(DIRECTORY msg
     FILES
 
     FaceDetected.msg 
-    FaceInfo.msg 
-    FaceExtraInfo.msg 
-    FaceShapeInfo.msg 
-    FaceEyePoints.msg 
-    FaceEyebrowPoints.msg 
-    FaceNosePoints.msg 
-    FaceMouthPoints.msg 
 )
 
 #And now generate the messages
