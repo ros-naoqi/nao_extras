@@ -36,7 +36,7 @@ import rospy
 
 import naoqi
 from std_msgs.msg import String
-from nao_extras_msgs.msg import FaceDetected
+from nao_interaction_msgs.msg import FaceDetected
 from naoqi import ( ALModule, ALBroker, ALProxy )
 
 #

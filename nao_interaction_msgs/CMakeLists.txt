@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(nao_extras_msgs)
+project(nao_interaction_msgs)
 
 #List to make rest of code more readable
 set( MESSAGE_DEPENDENCIES
