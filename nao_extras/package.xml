@@ -3,8 +3,11 @@
   <version>0.2.0</version>
   
   <description>
-    Extra tools for the Nao robot: teleoperation with a gamepad and path following. Renamed
-    from the nao_common stack.
+    Extra tools for the Nao robot: 
+      - teleoperation with a gamepad
+      - path following
+      - face detection 
+    Renamed from the nao_common stack.
   </description>
   
   <maintainer email="HornungA@informatik.uni-freiburg.de">Armin Hornung</maintainer>
@@ -21,5 +24,7 @@
 
  <run_depend>nao_path_follower</run_depend>
  <run_depend>nao_teleop</run_depend>
+ <run_depend>nao_interaction</run_depend>
+ <run_depend>nao_extras_msgs</run_depend>
 
 </package>
