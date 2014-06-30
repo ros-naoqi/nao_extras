@@ -54,7 +54,7 @@ public:
 	void pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal);
 	void goalCB(const geometry_msgs::PoseStampedConstPtr& goal);
 	void pathCB(const nav_msgs::PathConstPtr& goal);
-        bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
+  bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
 
 private:
   bool getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt);
@@ -73,6 +73,9 @@ private:
 	actionlib::SimpleActionServer<nao_msgs::FollowPathAction> m_walkPathServer;
 	ros::ServiceClient m_inhibitWalkClient, m_uninhibitWalkClient;
 	ros::Subscriber m_footContactSub;
+
+  tf::Transform m_prevRelTarget; ///< previous rel.target (used to prevent oscillations)
+  geometry_msgs::Twist m_velocity; ///< last published velocity (used to prevent oscillations)
 
 	std::string m_baseFrameId;     ///< Base frame of the robot.
 	double m_controllerFreq;       ///< Desired frequency for controller loop.
@@ -114,6 +117,7 @@ PathFollower::PathFollower()
   : privateNh("~"),
     m_walkGoalServer(nh, "walk_target", boost::bind(&PathFollower::goalActionCB, this, _1), false),
     m_walkPathServer(nh, "walk_path", boost::bind(&PathFollower::pathActionCB, this, _1), false),
+    m_prevRelTarget(tf::createQuaternionFromYaw(0.0)),
     m_baseFrameId("base_footprint"), m_controllerFreq(10),
     m_targetDistThres(0.05), m_targetAngThres(angles::from_degrees(5.)),
     m_waypointDistThres(0.05), m_waypointAngThres(angles::from_degrees(45)),
@@ -463,18 +467,18 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
 
 
 void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
-   ROS_INFO("path action starting...");
-
    nav_msgs::Path path = goal->path;
    nao_msgs::FollowPathFeedback feedback;
    
    if( path.poses.empty() )
    {
-      ROS_INFO("Stop requested by sending empty path.");
+      ROS_INFO("Path following: Stop requested by sending empty path.");
       stopWalk();
       m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(),"Stop succeeed");
       return;
    }
+
+   ROS_INFO("Path following action starting");
 
    ros::Rate r(m_controllerFreq);
 
@@ -497,6 +501,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          continue;
       }
    }
+  
    //lastTfSuccessTime = globalToBase.stamp_;
    lastTfSuccessTime = ros::Time::now();
 
@@ -863,19 +868,31 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	// Normalize angle between -180° and +180°
 	yaw = angles::normalize_angle(yaw);
 
+  if(rotateOnSpot) {
+    dx = 0.0;
+    dy = 0.0;
+    
+    // prevent oscillations when facing backwards:
+    if (std::abs(yaw) > 2.9 && std::abs(angles::shortest_angular_distance(tf::getYaw(relTarget.getRotation()), tf::getYaw(m_prevRelTarget.getRotation()))) < 0.4){
+      ROS_DEBUG("Path follower oscillation prevention: keeping last rotation direction");
+      // keep previous direction of rotation:
+      if (m_velocity.angular.z < 0.0){
+        yaw = -1.0*std::abs(yaw);
+      } else{
+        yaw = std::abs(yaw);
+      }
+    }
+      
+  } else {
+    dx = relTarget.getOrigin().x();
+    dy = relTarget.getOrigin().y();
+  }
+
 	// Reduce velocity near target
 	const double dampXY = std::min(dist / m_thresholdDampXY, 1.0);
 	const double dampYaw = std::min(std::abs(yaw) / m_thresholdDampYaw, 1.0);
 
-	if(rotateOnSpot) {
-	    dx = 0.0;
-	    dy = 0.0;
-	} else {
-	    dx = relTarget.getOrigin().x();
-	    dy = relTarget.getOrigin().y();
-	}
-
-        const double times[] = {
+    const double times[] = {
         std::abs(dx)  / ((dampXY * m_maxVelFractionX)    * m_maxVelXY  * m_stepFactor),
         std::abs(dy)  / ((dampXY * m_maxVelFractionY)    * m_maxVelXY  * m_stepFactor),
         std::abs(yaw) / ((dampYaw * m_maxVelFractionYaw) * m_maxVelYaw * m_stepFactor),
@@ -883,15 +900,19 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
     };
     const double maxtime = *std::max_element(times, times + 4);
 
-    geometry_msgs::Twist twist;
-    twist.linear.x  = dx  / (maxtime * m_maxVelXY  * m_stepFactor);
-    twist.linear.y  = dy  / (maxtime * m_maxVelXY  * m_stepFactor);
-    twist.angular.z = yaw / (maxtime * m_maxVelYaw * m_stepFactor);
+    m_velocity.linear.x  = dx  / (maxtime * m_maxVelXY  * m_stepFactor);
+    m_velocity.linear.y  = dy  / (maxtime * m_maxVelXY  * m_stepFactor);
+    m_velocity.linear.z = 0.0;
+    m_velocity.angular.x = 0.0;
+    m_velocity.angular.y = 0.0;
+    m_velocity.angular.z = yaw / (maxtime * m_maxVelYaw * m_stepFactor);
+    
 
     ROS_DEBUG("setVelocity: target %f %f %f --> velocity %f %f %f",
           relTarget.getOrigin().x(), relTarget.getOrigin().y(), yaw,
-          twist.linear.x, twist.linear.y, twist.angular.z);
-    m_velPub.publish(twist);
+              m_velocity.linear.x, m_velocity.linear.y, m_velocity.angular.z);
+    m_velPub.publish(m_velocity);
+    m_prevRelTarget = relTarget;
 }
 
 int main(int argc, char** argv){
