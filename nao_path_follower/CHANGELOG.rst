@@ -2,8 +2,8 @@
 Changelog for package nao_path_follower
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.1 (2014-09-07)
+------------------
 * Fixing oscillations in path follower when next target is behind robot
 * Add missing parameter for damping yaw velocity
 * Small cleanup of nao_path_follower, fix potential problems with std::distance

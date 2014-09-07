@@ -1,6 +1,6 @@
 <package>
   <name>nao_path_follower</name>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
   <description>
   Enables a Nao humanoid to either walk to a target location (with localization feedback),
   or follow a planned 2D path closely. Sends nao_msgs to the nao_walker node in nao_driver.
