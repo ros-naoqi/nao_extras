@@ -12,6 +12,8 @@
 *.la
 *.a
 
+core
+
 # ROS stuff
 .cproject
 .project

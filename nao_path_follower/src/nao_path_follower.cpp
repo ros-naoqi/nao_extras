@@ -1,6 +1,7 @@
 /*
  *
- * Copyright 2011-2013 Armin Hornung & Stefan Osswald, University of Freiburg
+ * Copyright 2011-2014 Armin Hornung, Stefan Osswald, Daniel Maier
+ * University of Freiburg
  * http://www.ros.org/wiki/nao
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,14 +54,15 @@ public:
 	void pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal);
 	void goalCB(const geometry_msgs::PoseStampedConstPtr& goal);
 	void pathCB(const nav_msgs::PathConstPtr& goal);
-        bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
+  bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
 
 private:
-        bool getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt);
+  bool getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt);
 	void stopWalk();
 	void setVelocity(const tf::Transform& relTarget);
 	void publishTargetPoseVis(const tf::Stamped<tf::Pose>& targetPose);
 	void footContactCallback(const std_msgs::BoolConstPtr& contact);
+  void inhibitJoystick();
 
 	ros::NodeHandle nh;
 	ros::NodeHandle privateNh;
@@ -72,10 +74,15 @@ private:
 	ros::ServiceClient m_inhibitWalkClient, m_uninhibitWalkClient;
 	ros::Subscriber m_footContactSub;
 
+  tf::Transform m_prevRelTarget; ///< previous rel.target (used to prevent oscillations)
+  geometry_msgs::Twist m_velocity; ///< last published velocity (used to prevent oscillations)
+
 	std::string m_baseFrameId;     ///< Base frame of the robot.
 	double m_controllerFreq;       ///< Desired frequency for controller loop.
-	double m_targetDistThres;      ///< Maximum linear deviation from target point.
-	double m_targetAngThres;       ///< Maximum angular deviation from target orientation.
+	double m_targetDistThres;      ///< Maximum linear deviation to reach target point.
+	double m_targetAngThres;       ///< Maximum angular deviation to reach target orientation.
+	double m_waypointDistThres;    ///< Maximum linear deviation to switch to next waypoint on path
+	double m_waypointAngThres;     ///< Maximum angular deviation to switch to next waypoint on path
 	bool m_isJoystickInhibited;    ///< True = joystick walk commands are inhibited.
 	bool m_useFootContactProtection;  ///< True = abort walk when robot is lifted off the ground
 	bool m_footContact;            ///< True = robot currently has foot contact with the ground.
@@ -96,22 +103,34 @@ private:
 	double m_thresholdDampXY;      ///< Slow down when distance to goal is smaller than this value [in meters].
 	double m_thresholdDampYaw;     ///< Slow down rotation when angular deviation from goal pose is smaller than this value [in radians].
         // for path following
-	double m_pathNextTargetDistance;     ///< Cumulative Distance to next Velocity Target from current robot pose along path
+	double m_pathNextTargetDistance; ///< Cumulative Distance to next Velocity Target from current robot pose along path
+	double m_pathStartMaxDistance;   ///< Max distance to start of path from robot pose to accept path (safety)
+	double m_straightMaxRobotDev;	  ///< Maximum XY deviation of the robot off a straight until it is not recognized as such anymore
+	double m_straightMaxRobotYaw;	  ///< Maximum angle of the robot off a straight until it is not recognized as such anymore
+	double m_straightMaxPathDev;	  ///< Maximum angle deviation of the path off a straight (i.e. a curve in the path) until it is not recognized as such anymore
+	double m_straightThreshold;	  ///< Minimum length of a straigth that is to be recognized as such
+	double m_straightOffset;	///< Length of the targetPose offset if a straight is recognized
+	bool m_straight;		///< True = robot has a straight path in front of it with minimum length m_straightThreshold
 };
 
 PathFollower::PathFollower()
   : privateNh("~"),
     m_walkGoalServer(nh, "walk_target", boost::bind(&PathFollower::goalActionCB, this, _1), false),
     m_walkPathServer(nh, "walk_path", boost::bind(&PathFollower::pathActionCB, this, _1), false),
+    m_prevRelTarget(tf::createQuaternionFromYaw(0.0)),
     m_baseFrameId("base_footprint"), m_controllerFreq(10),
     m_targetDistThres(0.05), m_targetAngThres(angles::from_degrees(5.)),
+    m_waypointDistThres(0.05), m_waypointAngThres(angles::from_degrees(45)),
     m_isJoystickInhibited(false), 
     m_useFootContactProtection(true), m_footContact(true),
     m_useVelocityController(false),
     m_maxVelFractionX(0.7), m_maxVelFractionY(0.7), m_maxVelFractionYaw(0.7), m_stepFreq(0.5),
     m_maxVelXY(0.0952), m_maxVelYaw(angles::from_degrees(47.6)), m_minStepFreq(1.667), m_maxStepFreq(2.381),    
     m_thresholdFar(0.20), m_thresholdRotate(angles::from_degrees(45.)),
-    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(30.)), m_pathNextTargetDistance(0.1)
+    m_thresholdDampXY(0.20), m_thresholdDampYaw(angles::from_degrees(60.)), m_pathNextTargetDistance(0.1),
+    m_pathStartMaxDistance(0.1),
+    m_straightMaxRobotDev(0.1), m_straightMaxRobotYaw(0.25), m_straightMaxPathDev(0.1),
+    m_straightThreshold(0.2), m_straightOffset(0.3), m_straight(false)
 {
 
 	privateNh.param("base_frame_id", m_baseFrameId, m_baseFrameId);
@@ -119,6 +138,8 @@ PathFollower::PathFollower()
 	privateNh.param("controller_frequency", m_controllerFreq, m_controllerFreq);
 	privateNh.param("target_distance_threshold", m_targetDistThres, m_targetDistThres);
 	privateNh.param("target_angle_threshold", m_targetAngThres, m_targetAngThres);
+  privateNh.param("waypoint_distance_threshold", m_waypointDistThres, m_waypointDistThres);
+  privateNh.param("waypoint_angle_threshold", m_waypointAngThres, m_waypointAngThres);
 	privateNh.param("max_vel_x", m_maxVelFractionX, m_maxVelFractionX);
 	privateNh.param("max_vel_y", m_maxVelFractionY, m_maxVelFractionY);
 	privateNh.param("max_vel_yaw", m_maxVelFractionYaw, m_maxVelFractionYaw);
@@ -126,20 +147,20 @@ PathFollower::PathFollower()
 	privateNh.param("use_vel_ctrl", m_useVelocityController, m_useVelocityController);
 	privateNh.param("use_foot_contact_protection", m_useFootContactProtection, m_useFootContactProtection);
 	privateNh.param("path_next_target_distance", m_pathNextTargetDistance, m_pathNextTargetDistance);
+  privateNh.param("path_max_start_distance", m_pathStartMaxDistance, m_pathStartMaxDistance);
 	privateNh.param("threshold_damp_xy", m_thresholdDampXY, m_thresholdDampXY);
-        ROS_INFO("Param controller_frequency: %f",m_controllerFreq);
-        ROS_INFO("Param target_distance_threshold: %f",m_targetDistThres);
-        ROS_INFO("Param target_angle_threshold: %f",m_targetAngThres);
-        ROS_INFO("Param max_vel_x: %f, max_vel_y: %f, max_vel_yaw: %f",m_maxVelFractionX,m_maxVelFractionY,m_maxVelFractionYaw);
-        ROS_INFO("Param step_freq: %f",m_stepFreq);
-        ROS_INFO("Param use_vel_ctrl: %d",m_useVelocityController);
-        ROS_INFO("Param use_foot_contact_protection: %d",m_useFootContactProtection);
+  privateNh.param("threshold_damp_yaw", m_thresholdDampYaw, m_thresholdDampYaw);
+	
+	privateNh.param("straight_max_robot_dev", m_straightMaxRobotDev, m_straightMaxRobotDev);
+	privateNh.param("straight_max_robot_yaw", m_straightMaxRobotYaw, m_straightMaxRobotYaw);
+	privateNh.param("straight_max_path_dev", m_straightMaxPathDev, m_straightMaxPathDev);
+	privateNh.param("straight_threshold", m_straightThreshold, m_straightThreshold);
+	privateNh.param("straight_offset", m_straightOffset, m_straightOffset);
 
 	m_stepFactor = ((m_maxStepFreq - m_minStepFreq) * m_stepFreq + m_minStepFreq) / m_maxStepFreq;
         ROS_INFO("Using step factor of %4.2f",m_stepFactor);
 
 	if(m_useVelocityController) {
-	    ROS_WARN("Velocity controller is not working yet!");
 	    ROS_INFO("Using velocity controller");
 	    m_velPub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
 	} else {
@@ -205,7 +226,19 @@ void PathFollower::pathCB(const nav_msgs::PathConstPtr& goal) {
 }
 
 void PathFollower::footContactCallback(const std_msgs::BoolConstPtr& contact) {
-    m_footContact = contact->data;
+  m_footContact = contact->data;
+}
+
+void PathFollower::inhibitJoystick(){
+  if(!m_isJoystickInhibited) {
+    std_srvs::Empty e;
+    if(m_inhibitWalkClient.call(e)) {
+      ROS_INFO("Joystick inhibited");
+      m_isJoystickInhibited = true;
+    } else {
+      ROS_WARN_ONCE("Could not inhibit joystick walk");
+    }
+  }  
 }
 
 
@@ -243,9 +276,17 @@ bool PathFollower::getRobotPose( tf::StampedTransform & globalToBase, const std:
    return true;
 }
 
-double distance (const tf::Pose & p1, const tf::Pose & p2)
+double poseDist(const tf::Pose& p1, const tf::Pose& p2)
 {
-   return (p1.getOrigin() - p2.getOrigin()).length();
+  return (p1.getOrigin() - p2.getOrigin()).length();
+}
+
+double poseDist(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2){
+  tf::Vector3 p1_tf, p2_tf;
+  tf::pointMsgToTF(p1.position, p1_tf);
+  tf::pointMsgToTF(p2.position, p2_tf);
+
+  return (p1_tf - p2_tf).length();
 }
 
 void print_transform(const tf::Transform & t)
@@ -254,32 +295,31 @@ void print_transform(const tf::Transform & t)
    tf::poseTFToMsg(t, m);
    std::cout << m;
 }
-double getYawBetween(const tf::Transform & p1, const tf::Transform & p2)
-{
-   tf::Vector3 o1 = p1.getOrigin();
-   tf::Vector3 o2 = p2.getOrigin();
-   return  std::atan2( o2.getY() - o1.getY(), o2.getX() - o1.getX());
+
+double getYawBetween(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2){
+   tf::Vector3 o1, o2;
+   tf::pointMsgToTF(p1.position, o1);
+   tf::pointMsgToTF(p2.position, o2);
+
+   return  std::atan2(o2.getY() - o1.getY(), o2.getX() - o1.getX());
 }
+
+double getYawBetween(const tf::Transform & p1, const tf::Transform & p2){
+  tf::Vector3 o1 = p1.getOrigin();
+  tf::Vector3 o2 = p2.getOrigin();
+  return  std::atan2( o2.getY() - o1.getY(), o2.getX() - o1.getX());
+}
+
 tf::Quaternion getOrientationBetween(const tf::Transform & p1, const tf::Transform & p2)
 {
-   /*
-   tf::Quaternion q;
-   tf::Transform t1 = p1;
-   t1.setRotation(tf::createQuaternionFromYaw(0.0));
-   tf::Transform t2 = p2;
-   t2.setRotation(tf::createQuaternionFromYaw(0.0));
-   print_transform(t1);
-   print_transform(t2);
-   std::cout << std::endl;
-
-   tf::Transform relTarget = t1.inverseTimes(t2);
-   print_transform(relTarget);
-   std::cout << std::endl;
-   relTarget.getBasis().getRPY(roll, pitch, yaw);
-   */
-   //ROS_INFO("Computed yaw %f ",  yaw);
    double yaw = getYawBetween(p1, p2);
    return (tf::createQuaternionFromYaw(yaw));
+}
+
+tf::Quaternion getOrientationBetween(const geometry_msgs::Pose& p1, const geometry_msgs::Pose& p2)
+{
+  double yaw = getYawBetween(p1, p2);
+  return (tf::createQuaternionFromYaw(yaw));
 }
 
 
@@ -288,13 +328,10 @@ typedef std::vector< geometry_msgs::PoseStamped>::const_iterator PathIterator;
 double moveAlongPathByDistance( const PathIterator & start, PathIterator & end, double targetDistance)
 {
    PathIterator iter = start;
-   tf::Stamped<tf::Transform> tfPose, tfPose2;
    double dist = 0.0;
-   while(iter+1 != end )
-   {
-      tf::poseStampedMsgToTF(*(iter), tfPose);
-      tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-      double d = distance( tfPose, tfPose2);
+   while(iter+1 != end ){
+
+      double d = poseDist(iter->pose, (iter+1)->pose);
       if (dist + d > targetDistance )
          break;
       dist += d;
@@ -305,8 +342,8 @@ double moveAlongPathByDistance( const PathIterator & start, PathIterator & end, 
 }
 
 // this function assumes that robotPose is close (< robot_start_path_threshold) to *currentPathPoseIt 
-bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt)
-{  
+bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& robotPose,  const std::vector<geometry_msgs::PoseStamped>::const_iterator & currentPathPoseIt, tf::Stamped<tf::Transform> & targetPose, std::vector< geometry_msgs::PoseStamped>::const_iterator & targetPathPoseIt)
+{
 
    // current state in  path unclear: cannot go further, end of path reached
    if( path.poses.empty() || currentPathPoseIt == path.poses.end() ) // past-the-end of path
@@ -317,29 +354,73 @@ bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & r
    }
 
    
-   // 0 successors possible from currentPathPoseIt
+   // no successors in path: last pose or only one pose in path
    if( currentPathPoseIt+1 == path.poses.end() )
    {
-      // this can happen, if we are close to the final goal or someone send us a single goal wrapped as path (not allowed)
-      // under first assumption it we just keep the current targetPose
-      ROS_INFO("Goal almost reached! Keeping targetPose. ");
+      // this can happen, if we are close to the final goal or the path only has one pose
+      // => just keep targetPose until reached
+      ROS_DEBUG("Goal almost reached! Keeping targetPose. ");
+
+      // ensure that the orientation is valid
+      if (!hasOrientation(targetPathPoseIt->pose)){
+        // best guess: current rotation
+        targetPose.setRotation(robotPose.getRotation());
+      }
       return true;
    }
-   // from here, currentPathPoseIt has at least one successor
 
+   // TODO: check if successor exists, otherwise go to target pose with orientation
+   // or ignore orientation if there is none (take current)
+
+
+   
+   // Check if the robot encounters a straight line in the path, where it can walk faster.
+   // The straight/remaining path has to have a minimum length of m_straightThreshold.
+   m_straight = false;
+   std::vector< geometry_msgs::PoseStamped>::const_iterator farIter = currentPathPoseIt;
+   tf::Stamped<tf::Transform> currentPose, nearPose, farPose;
+   tf::poseStampedMsgToTF(*(currentPathPoseIt), currentPose);
+   double straightDist = 0.0;
+   bool nearEnd = true;
+   while(farIter+1 != path.poses.end()){
+     tf::poseStampedMsgToTF(*farIter, farPose);
+     if(straightDist <= m_straightThreshold/4)
+       tf::poseStampedMsgToTF(*farIter, nearPose);
+     straightDist += poseDist(farIter->pose, (farIter+1)->pose);
+     if(straightDist > m_straightThreshold){
+       nearEnd = false;
+       break;
+     }
+     ++farIter;
+   }
+   // actually check if the path is straight, if the robot is within a certain distance of the straight, and if the robot faces the straight
+   if(!nearEnd){
+     double robotYaw = tf::getYaw(robotPose.getRotation());
+     double robotToFar = getYawBetween(robotPose, farPose);
+     double currentToNear = getYawBetween(currentPose, nearPose);
+     double currentToFar = getYawBetween(currentPose, farPose);
+     bool robot_on_straight = (poseDist(robotPose, currentPose) < m_straightMaxRobotDev);
+     bool path_is_straight = std::abs(angles::shortest_angular_distance(currentToNear,currentToFar)) < m_straightMaxPathDev;
+     bool robot_faces_straight = std::abs(angles::shortest_angular_distance(robotYaw,robotToFar)) < m_straightMaxRobotYaw;
+
+     m_straight = (robot_on_straight && path_is_straight && robot_faces_straight);
+     //ROS_DEBUG_STREAM("Straight path: " << robot_on_straight << " " << path_is_straight << " " << robot_faces_straight);
+     if(m_straight)
+       ROS_DEBUG("Robot is walking on a straight path.");
+
+   }
+   
+   
    // rewrite
    std::vector< geometry_msgs::PoseStamped>::const_iterator iter = currentPathPoseIt+1;
-   tf::Stamped<tf::Transform> tfPose, tfPose2;
+   tf::Stamped<tf::Transform> tfPose;
    tf::poseStampedMsgToTF( *iter, tfPose);
-   double dist = distance( robotPose, tfPose);
+   double dist = poseDist( robotPose, tfPose);
    bool targetIsEndOfPath = true;
-   double targetDistance = m_pathNextTargetDistance; // target at most x cm ahead of robot
    while(iter+1 != path.poses.end() )
    {
-      tf::poseStampedMsgToTF(*iter, tfPose);
-      tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-      double d = distance( tfPose, tfPose2);
-      if (dist + d > targetDistance )
+      double d = poseDist(iter->pose, (iter+1)->pose);
+      if (dist + d > m_pathNextTargetDistance )
       {
          targetIsEndOfPath = false;
          break;
@@ -352,84 +433,25 @@ bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & r
    tf::poseStampedMsgToTF(*iter, targetPose);
    
 
-   // check if poses have orientation
+   // if no orientation, then compute from  waypoint
    if ( !hasOrientation (iter->pose) )
    {
-      //ROS_WARN("Target has no orientation. Computing orientation from other waypoints.");
 
       tf::Quaternion orientation;
-      if( iter==currentPathPoseIt ) // path has only one element so get orientation from robot to poses[0]
+      assert(iter != currentPathPoseIt);
+      if (targetIsEndOfPath) // path length >= 2 and iter points to end of path
       {
-         ROS_ERROR("This case should never happend (anymore)");
-         orientation = getOrientationBetween( robotPose, targetPose);
-         assert(0); // produce seg fault // TODO: To remove this later
-      }
-      else if (targetIsEndOfPath) // path length >= 2 and iter points to end of path
-      {
-         tf::Stamped<tf::Transform> prevPose;
-         tf::poseStampedMsgToTF( *(iter-1), prevPose );
-         orientation = getOrientationBetween( prevPose, targetPose);
+        orientation = getOrientationBetween( (iter-1)->pose, targetPathPoseIt->pose);
       }
       else // iter has at least one succesor
       {
-         // set Orientation so that successor of targetPose are faced
-         /*
-         ++iter;
-         tf::poseStampedMsgToTF( *iter, tfPose );
-         dist = distance( targetPose, tfPose );
-         while(iter+1 != path.poses.end() )
-         {
-            tf::poseStampedMsgToTF(*(iter), tfPose);
-            tf::poseStampedMsgToTF(*(iter+1), tfPose2);
-            double d = distance( tfPose, tfPose2);
-            if (dist + d > targetDistance )
-               break;
-            dist += d;
-            ++iter;
+         // set Orientation so that successor of targetPose is faced        
+         double yaw =  getYawBetween(targetPathPoseIt->pose, (targetPathPoseIt+1)->pose);
+         if (targetPathPoseIt-1 != path.poses.begin() && targetPathPoseIt + 2 != path.poses.end() ){
+           double yaw1 = getYawBetween((targetPathPoseIt-2)->pose, targetPathPoseIt->pose);
+           double yaw2 = getYawBetween(targetPathPoseIt->pose, (targetPathPoseIt+2)->pose);
+           yaw = atan2( sin(yaw1)+sin(yaw2), cos(yaw1) + cos(yaw2) );
          }
-         ROS_INFO("Found successor at %4.2f, %4.2f", tfPose.getOrigin().x(), tfPose.getOrigin().y());
-         */
-         //std::vector< tf::Stamped<tf::Transform> > poses;
-         /*
-         iter = targetPathPoseIt;
-         double cumDist = 0.0;
-         double sinSum = 0.0;
-         double cosSum = 0.0;
-         // first add robot orientation
-         double yaw = getYawBetween( robotPose, targetPose); 
-         sinSum += std::sin(yaw);
-         cosSum += std::cos(yaw);
-         ROS_INFO("Found target at %4.2f, %4.2f, %4.2f", targetPose.getOrigin().x(), targetPose.getOrigin().y(), yaw*180.0/M_PI);
-         for(int i =0; i < 2 ; ++i )
-         {
-            PathIterator end = path.poses.end();
-            cumDist += moveAlongPathByDistance( iter, end, targetDistance);
-            tf::poseStampedMsgToTF(*(iter), tfPose2);
-            tf::poseStampedMsgToTF(*(end), tfPose);
-            double yaw = getYawBetween( tfPose2, tfPose); 
-            sinSum += std::sin(yaw);
-            cosSum += std::cos(yaw);
-            //poses.push_back(tfPose);
-            iter = end;
-            ROS_INFO("Found successor at %4.2f, %4.2f, %4.2f", tfPose.getOrigin().x(), tfPose.getOrigin().y(), yaw*180.0/M_PI);
-            if( iter+1 == path.poses.end() )
-               break;
-         }
-         yaw = std::atan2( sinSum, cosSum );
-         */
-         tf::poseStampedMsgToTF(*(targetPathPoseIt+1), tfPose2 );
-         double oldyaw = getYawBetween( targetPose, tfPose2);
-         double yaw = oldyaw;
-         if (targetPathPoseIt-1 != path.poses.begin() && targetPathPoseIt + 2 != path.poses.end() )
-         {
-
-            tf::poseStampedMsgToTF(*(targetPathPoseIt-2), tfPose);
-            tf::poseStampedMsgToTF(*(targetPathPoseIt+2), tfPose2 );
-            double yaw1 = getYawBetween(tfPose, targetPose);
-            double yaw2 = getYawBetween(targetPose, tfPose2);
-            yaw = atan2( sin(yaw1)+sin(yaw2), cos(yaw1) + cos(yaw2) );
-         }
-         ROS_INFO("Using yaw %4.2f instead of %4.2f (old method)", yaw*180.0/M_PI, oldyaw*180.0/M_PI);
          orientation = tf::createQuaternionFromYaw(yaw);
 
 
@@ -445,24 +467,19 @@ bool PathFollower::getNextTarget(const nav_msgs::Path & path, const tf::Pose & r
 
 
 void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
-   ROS_INFO("path action starting...");
-
    nav_msgs::Path path = goal->path;
    nao_msgs::FollowPathFeedback feedback;
+   
    if( path.poses.empty() )
    {
-      ROS_INFO("Stop requested by sending empty path.");
+      ROS_INFO("Path following: Stop requested by sending empty path.");
       stopWalk();
       m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(),"Stop succeeed");
       return;
    }
-   if(path.poses.size()==1)
-   {
-      ROS_INFO("Sending a single goal is not supported (use walk_target instead).");
-      stopWalk();
-      m_walkPathServer.setAborted(nao_msgs::FollowPathResult(),"Single goal stop");
-      return;
-   }
+
+   ROS_INFO("Path following action starting");
+
    ros::Rate r(m_controllerFreq);
 
    ros::Time lastTfSuccessTime = ros::Time::now();
@@ -484,16 +501,20 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          continue;
       }
    }
+  
    //lastTfSuccessTime = globalToBase.stamp_;
    lastTfSuccessTime = ros::Time::now();
 
    // Check if start of path is consistent with current robot pose, otherwise abort
    std::vector< geometry_msgs::PoseStamped>::const_iterator currentPathPoseIt, targetPathPoseIt;
    currentPathPoseIt = path.poses.begin();
-   tf::Stamped<tf::Transform> tmp;
-   tf::poseStampedMsgToTF( *currentPathPoseIt, tmp);
-   double robot_start_path_threshold = 0.05; // TODO: Param
-   if (distance(tmp, globalToBase)> robot_start_path_threshold )
+   targetPathPoseIt = currentPathPoseIt;
+   // This is where Nao is currently walking to (current sub goal)
+   tf::Stamped<tf::Transform> targetPose;
+   
+   tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
+
+   if (poseDist(targetPose, globalToBase)> m_pathStartMaxDistance)
    {
       ROS_ERROR("Robot is too far away from start of plan. aborting");
       stopWalk();
@@ -502,19 +523,9 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
    }
 
 
-   // This is where Nao is currently walking to (current sub goal)
-   tf::Stamped<tf::Transform> targetPose;
    bool targetIsEndOfPath = getNextTarget(path, globalToBase, currentPathPoseIt, targetPose, targetPathPoseIt );
    publishTargetPoseVis(targetPose);
-   if(!m_isJoystickInhibited) {
-      std_srvs::Empty e;
-      if(m_inhibitWalkClient.call(e)) {
-         ROS_INFO("Joystick inhibited");
-         m_isJoystickInhibited = true;
-      } else {
-         ROS_WARN("Could not inhibit joystick walk");
-      }
-   }
+   inhibitJoystick();
    
    while(ros::ok()){
       if (! getRobotPose(globalToBase, global_frame_id) )
@@ -554,21 +565,11 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
                m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(),"Stop succeeed");
                return;
             }
-            /*
-            if(path.poses.size()==1)
-            {
-               ROS_INFO("Sending a single goal is not supported (use walk_target instead).");
-               stopWalk();
-               m_walkPathServer.setAborted(nao_msgs::FollowPathResult(),"Single goal stop");
-               return;
-            }
-            */
 
             // Check if start of path is consistent with current robot pose, otherwise abort
             currentPathPoseIt = path.poses.begin();
-            tf::Stamped<tf::Transform> tmp;
-            tf::poseStampedMsgToTF( *currentPathPoseIt, tmp);
-            if (distance(tmp, globalToBase)> robot_start_path_threshold )
+            tf::poseStampedMsgToTF( *currentPathPoseIt, targetPose);
+            if (poseDist(targetPose, globalToBase)> m_pathStartMaxDistance )
             {
                ROS_ERROR("Robot is too far away from start of plan. aborting");
                stopWalk();
@@ -579,18 +580,11 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
             // set targetPose, this will not change until we reached it
             targetIsEndOfPath = getNextTarget(path, globalToBase, currentPathPoseIt, targetPose, targetPathPoseIt );
             publishTargetPoseVis(targetPose);
-            if(!m_isJoystickInhibited) {
-               std_srvs::Empty e;
-               if(m_inhibitWalkClient.call(e)) {
-                  ROS_INFO("Joystick inhibited");
-                  m_isJoystickInhibited = true;
-               } else {
-                  ROS_WARN("Could not inhibit joystick walk");
-               }
-            }
+            inhibitJoystick();
+            
          } else {
             ROS_INFO("walk_path ActionServer preempted");
-            // anything to cleanup?e)
+            // anything to cleanup?
             stopWalk();
 
             m_walkPathServer.setPreempted();
@@ -605,7 +599,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          return;
       }
 
-
+      // TODO: publish feedback
       /*
          move_base_msgs::MoveBaseFeedback feedback;
          feedback.base_position.header.stamp = globalToBase.stamp_;
@@ -621,8 +615,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
 
       // treat last targetPose different from other waypoints on path
-      if (targetIsEndOfPath && relTarget.getOrigin().length()< m_targetDistThres && std::abs(yaw) < m_targetAngThres)
-      {
+      if (targetIsEndOfPath && relTarget.getOrigin().length()< m_targetDistThres && std::abs(yaw) < m_targetAngThres){
          ROS_INFO("Target (%f %f %F) reached", targetPose.getOrigin().x(), targetPose.getOrigin().y(),
                tf::getYaw(targetPose.getRotation()));
 
@@ -630,11 +623,7 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
 
          m_walkPathServer.setSucceeded(nao_msgs::FollowPathResult(), "Target reached");
          return;
-      }
-      // TODO: Use other thresholds for target != endOfPath
-      else if ( relTarget.getOrigin().length()< robot_start_path_threshold && std::abs(yaw) < 45*M_PI/180.0)
-      {
-         ROS_INFO("Advancing targetPose..");
+      } else if (!targetIsEndOfPath && relTarget.getOrigin().length()< m_waypointDistThres && std::abs(yaw) < m_waypointAngThres){
          // update currentPathPoseIt to point to waypoint corresponding to  targetPose
          currentPathPoseIt = targetPathPoseIt;
          // update targetPose, targetPathPoseIt
@@ -643,24 +632,38 @@ void PathFollower::pathActionCB(const nao_msgs::FollowPathGoalConstPtr &goal){
          // update relTarget
          relTarget = globalToBase.inverseTimes(targetPose);
       }
+      
 
       // walk to targetPose (relTarget)
+      // if the robot is walking on a straight line, set the target point further ahead (by m_straightOffset)
+      tf::Transform relTargetStraight = relTarget;
+      if(m_straight){
+        std::vector< geometry_msgs::PoseStamped>::const_iterator targetIter = currentPathPoseIt;
+        tf::Stamped<tf::Transform> targetPose, iterPose;
+        double straightDist = 0.0;
+        while(targetIter+1 != path.poses.end()){
+          tf::poseStampedMsgToTF(*targetIter, targetPose);
+          tf::poseStampedMsgToTF(*(targetIter+1), iterPose);
+          straightDist += poseDist(targetPose, iterPose);
+          if(straightDist > m_straightOffset)
+            break;
+          ++targetIter;
+        }
+        tf::Stamped<tf::Transform> straightTargetPose;
+        tf::poseStampedMsgToTF(*targetIter, straightTargetPose);
+        relTargetStraight = globalToBase.inverseTimes(straightTargetPose);
+        relTargetStraight.setRotation(relTarget.getRotation());
+      }
       if(m_useVelocityController) {
-         setVelocity(relTarget);
+         setVelocity(relTargetStraight);
       } else {
          geometry_msgs::Pose2D target;
-         // workaround for NaoQI API (stay on the straight line connection facing towards goal)
-         if (relTarget.getOrigin().length() > 0.2){
-            relTarget.setOrigin(0.2* relTarget.getOrigin().normalized());
-            yaw = atan2(relTarget.getOrigin().y(), relTarget.getOrigin().x());
-         }
-         target.x = relTarget.getOrigin().x();
-         target.y = relTarget.getOrigin().y();
-         target.theta = yaw;
+         target.x = relTargetStraight.getOrigin().x();
+         target.y = relTargetStraight.getOrigin().y();
+         target.theta = tf::getYaw(relTargetStraight.getRotation());
 
          m_targetPub.publish(target);
       }
-
 
       r.sleep();
       //make sure to sleep for the remainder of our cycle time
@@ -688,16 +691,7 @@ void PathFollower::goalActionCB(const move_base_msgs::MoveBaseGoalConstPtr &goal
 	publishTargetPoseVis(targetPose);
 
 	ros::Rate r(m_controllerFreq);
-
-    if(!m_isJoystickInhibited) {
-        std_srvs::Empty e;
-        if(m_inhibitWalkClient.call(e)) {
-            ROS_INFO("Joystick inhibited");
-            m_isJoystickInhibited = true;
-        } else {
-            ROS_WARN("Could not inhibit joystick walk");
-        }
-    }
+  inhibitJoystick();
 
 
 	while(nh.ok()){
@@ -707,18 +701,11 @@ void PathFollower::goalActionCB(const move_base_msgs::MoveBaseGoalConstPtr &goal
 				move_base_msgs::MoveBaseGoal newGoal = *m_walkGoalServer.acceptNewGoal();
 				tf::poseStampedMsgToTF(newGoal.target_pose, targetPose);
 				publishTargetPoseVis(targetPose);
-				if(!m_isJoystickInhibited) {
-				    std_srvs::Empty e;
-					if(m_inhibitWalkClient.call(e)) {
-					    ROS_INFO("Joystick inhibited");
-						m_isJoystickInhibited = true;
-					} else {
-						ROS_WARN("Could not inhibit joystick walk");
-					}
-				}
+        inhibitJoystick();
+        
 			} else {
 				ROS_INFO("walk_target ActionServer preempted");
-				// anything to cleanup?e)
+				// anything to cleanup?
 				stopWalk();
 
 				m_walkGoalServer.setPreempted();
@@ -859,7 +846,7 @@ distance            | angle               | strategy
 void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	double dx, dy, yaw;
 	bool rotateOnSpot;
-    const double dist = relTarget.getOrigin().length();
+        const double dist = relTarget.getOrigin().length();
 	if(dist > m_thresholdFar) {
 	    // Far away: Orient towards the target point
 	    yaw = atan2(relTarget.getOrigin().y(), relTarget.getOrigin().x());
@@ -867,31 +854,43 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
 	} else {
 	    // Near: Orient towards the final angle
 	    yaw = tf::getYaw(relTarget.getRotation());
-        rotateOnSpot = (dist < m_targetDistThres);
-        if(dist < m_targetDistThres && std::abs(yaw) < m_targetAngThres) {
-            geometry_msgs::Twist twist;
-            twist.linear.x = 0.0;
-            twist.linear.y = 0.0;
-            twist.angular.z = 0.0;
-            m_velPub.publish(twist);
-            return;
-        }
+            rotateOnSpot = (std::abs(yaw) > m_thresholdRotate);
+            if(dist < m_targetDistThres && std::abs(yaw) < m_targetAngThres) {
+	        geometry_msgs::Twist twist;
+	        twist.linear.x = 0.0;
+	        twist.linear.y = 0.0;
+	        twist.angular.z = 0.0;
+                m_velPub.publish(twist);
+                return;
+            }
 	}
 
 	// Normalize angle between -180° and +180°
 	yaw = angles::normalize_angle(yaw);
 
+  if(rotateOnSpot) {
+    dx = 0.0;
+    dy = 0.0;
+    
+    // prevent oscillations when facing backwards:
+    if (std::abs(yaw) > 2.9 && std::abs(angles::shortest_angular_distance(tf::getYaw(relTarget.getRotation()), tf::getYaw(m_prevRelTarget.getRotation()))) < 0.4){
+      ROS_DEBUG("Path follower oscillation prevention: keeping last rotation direction");
+      // keep previous direction of rotation:
+      if (m_velocity.angular.z < 0.0){
+        yaw = -1.0*std::abs(yaw);
+      } else{
+        yaw = std::abs(yaw);
+      }
+    }
+      
+  } else {
+    dx = relTarget.getOrigin().x();
+    dy = relTarget.getOrigin().y();
+  }
+
 	// Reduce velocity near target
 	const double dampXY = std::min(dist / m_thresholdDampXY, 1.0);
 	const double dampYaw = std::min(std::abs(yaw) / m_thresholdDampYaw, 1.0);
-
-	if(rotateOnSpot) {
-	    dx = 0.0;
-	    dy = 0.0;
-	} else {
-	    dx = relTarget.getOrigin().x();
-	    dy = relTarget.getOrigin().y();
-	}
 
     const double times[] = {
         std::abs(dx)  / ((dampXY * m_maxVelFractionX)    * m_maxVelXY  * m_stepFactor),
@@ -901,15 +900,19 @@ void PathFollower::setVelocity(const tf::Transform& relTarget) {
     };
     const double maxtime = *std::max_element(times, times + 4);
 
-    geometry_msgs::Twist twist;
-    twist.linear.x  = dx  / (maxtime * m_maxVelXY  * m_stepFactor);
-    twist.linear.y  = dy  / (maxtime * m_maxVelXY  * m_stepFactor);
-    twist.angular.z = yaw / (maxtime * m_maxVelYaw * m_stepFactor);
+    m_velocity.linear.x  = dx  / (maxtime * m_maxVelXY  * m_stepFactor);
+    m_velocity.linear.y  = dy  / (maxtime * m_maxVelXY  * m_stepFactor);
+    m_velocity.linear.z = 0.0;
+    m_velocity.angular.x = 0.0;
+    m_velocity.angular.y = 0.0;
+    m_velocity.angular.z = yaw / (maxtime * m_maxVelYaw * m_stepFactor);
+    
 
     ROS_DEBUG("setVelocity: target %f %f %f --> velocity %f %f %f",
           relTarget.getOrigin().x(), relTarget.getOrigin().y(), yaw,
-          twist.linear.x, twist.linear.y, twist.angular.z);
-    m_velPub.publish(twist);
+              m_velocity.linear.x, m_velocity.linear.y, m_velocity.angular.z);
+    m_velPub.publish(m_velocity);
+    m_prevRelTarget = relTarget;
 }
 
 int main(int argc, char** argv){
