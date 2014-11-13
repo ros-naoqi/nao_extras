@@ -1,6 +1,6 @@
 <package>
   <name>nao_extras</name>
-  <version>0.2.1</version>
+  <version>0.2.2</version>
   
   <description>
     Extra tools for the Nao robot: teleoperation with a gamepad and path following. Renamed

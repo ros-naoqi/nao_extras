@@ -2,8 +2,8 @@
 Changelog for package nao_teleop
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.2.2 (2014-11-13)
+------------------
 * comply to the new naoqi organization
 * Contributors: Vincent Rabaud
 
