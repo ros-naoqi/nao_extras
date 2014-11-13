@@ -2,6 +2,11 @@
 Changelog for package nao_path_follower
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* comply to the new naoqi organization
+* Contributors: Vincent Rabaud
+
 0.2.1 (2014-09-07)
 ------------------
 * Fixing oscillations in path follower when next target is behind robot

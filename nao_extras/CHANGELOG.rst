@@ -2,6 +2,11 @@
 Changelog for package nao_extras
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* comply to the new naoqi organization
+* Contributors: Vincent Rabaud
+
 0.2.1 (2014-09-07)
 ------------------
 * Fix package.xml files
