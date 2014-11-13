@@ -3,6 +3,7 @@ project(nao_path_follower)
 
 # Declare main C++ dependencies
 set(ROS_CXX_DEPENDENCIES
+  naoqi_msgs
   roscpp
   tf
   std_msgs
@@ -10,7 +11,6 @@ set(ROS_CXX_DEPENDENCIES
   geometry_msgs
   nav_msgs
   move_base_msgs
-  nao_msgs
   actionlib
   angles
 )

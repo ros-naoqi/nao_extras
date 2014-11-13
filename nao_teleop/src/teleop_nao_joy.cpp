@@ -68,11 +68,11 @@ TeleopNaoJoy::TeleopNaoJoy()
   m_headAngles.speed = 0.2; // TODO: param
 
   m_movePub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 10);
-  m_headPub = nh.advertise<nao_msgs::JointAnglesWithSpeed>("joint_angles", 1);
+  m_headPub = nh.advertise<naoqi_msgs::JointAnglesWithSpeed>("joint_angles", 1);
   m_speechPub = nh.advertise<std_msgs::String>("speech", 1);
   m_inhibitWalkSrv = nh.advertiseService("inhibit_walk", &TeleopNaoJoy::inhibitWalk, this);
   m_uninhibitWalkSrv = nh.advertiseService("uninhibit_walk", &TeleopNaoJoy::uninhibitWalk, this);
-  m_cmdVelClient = nh.serviceClient<nao_msgs::CmdVelService>("cmd_vel_srv");
+  m_cmdVelClient = nh.serviceClient<naoqi_msgs::CmdVelService>("cmd_vel_srv");
   m_stiffnessDisableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/disable");
   m_stiffnessEnableClient = nh.serviceClient<std_srvs::Empty>("body_stiffness/enable");
 
@@ -95,7 +95,7 @@ bool TeleopNaoJoy::callBodyPoseClient(const std::string& poseName){
     return false;
   }
 
-  nao_msgs::BodyPoseGoal goal;
+  naoqi_msgs::BodyPoseGoal goal;
   goal.pose_name = poseName;
   m_bodyPoseClient.sendGoalAndWait(goal, m_bodyPoseTimeOut);
   actionlib::SimpleClientGoalState state = m_bodyPoseClient.getState();
@@ -285,7 +285,7 @@ bool TeleopNaoJoy::inhibitWalk(std_srvs::EmptyRequest& /*req*/, std_srvs::EmptyR
     m_motion.angular.x = 0.0;
     m_motion.angular.y = 0.0;
     m_motion.angular.z = 0.0;
-    nao_msgs::CmdVelService service_call;
+    naoqi_msgs::CmdVelService service_call;
     service_call.request.twist = m_motion;
     m_cmdVelClient.call(service_call);
   }

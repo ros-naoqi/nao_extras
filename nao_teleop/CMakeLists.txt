@@ -3,9 +3,9 @@ project(nao_teleop)
 
 # List C++ dependencies on ros packages
 set( ROS_CXX_DEPENDENCIES
+    naoqi_msgs
     roscpp
     std_msgs
-    nao_msgs
     sensor_msgs
     actionlib)
 
