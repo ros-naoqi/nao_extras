@@ -40,7 +40,7 @@
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <move_base_msgs/MoveBaseAction.h>
-#include <naoqi_msgs/FollowPathAction.h>
+#include <naoqi_bridge_msgs/FollowPathAction.h>
 #include <actionlib/server/simple_action_server.h>
 #include <angles/angles.h>
 #include <assert.h>
@@ -51,7 +51,7 @@ public:
 	PathFollower();
 	~PathFollower();
 	void goalActionCB(const move_base_msgs::MoveBaseGoalConstPtr &goal);
-	void pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal);
+	void pathActionCB(const naoqi_bridge_msgs::FollowPathGoalConstPtr &goal);
 	void goalCB(const geometry_msgs::PoseStampedConstPtr& goal);
 	void pathCB(const nav_msgs::PathConstPtr& goal);
   bool getRobotPose( tf::StampedTransform & globalToBase, const std::string & global_frame_id);
@@ -70,7 +70,7 @@ private:
 	ros::Publisher m_targetPub, m_velPub, m_actionGoalPub, m_visPub, m_actionPathPub;
 	tf::TransformListener m_tfListener;
 	actionlib::SimpleActionServer<move_base_msgs::MoveBaseAction> m_walkGoalServer;
-	actionlib::SimpleActionServer<naoqi_msgs::FollowPathAction> m_walkPathServer;
+	actionlib::SimpleActionServer<naoqi_bridge_msgs::FollowPathAction> m_walkPathServer;
 	ros::ServiceClient m_inhibitWalkClient, m_uninhibitWalkClient;
 	ros::Subscriber m_footContactSub;
 
@@ -169,7 +169,7 @@ PathFollower::PathFollower()
 	}
 
 	m_actionGoalPub = nh.advertise<move_base_msgs::MoveBaseActionGoal>("walk_target/goal", 1);
-	m_actionPathPub = nh.advertise<naoqi_msgs::FollowPathActionGoal>("walk_path/goal", 1);
+	m_actionPathPub = nh.advertise<naoqi_bridge_msgs::FollowPathActionGoal>("walk_path/goal", 1);
 	//we'll provide a mechanism for some people to send goals or paths as PoseStamped messages over a topic
 	//they won't get any useful information back about its status, but this is useful for tools
 	//like nav_view and rviz
@@ -219,7 +219,7 @@ void PathFollower::goalCB(const geometry_msgs::PoseStampedConstPtr& goal) {
 void PathFollower::pathCB(const nav_msgs::PathConstPtr& goal) {
    ROS_INFO("Simple Path callback");
 	ROS_DEBUG("In ROS path callback, wrapping the Path in the action message and re-sending to the server.");
-        naoqi_msgs::FollowPathActionGoal action_goal;
+        naoqi_bridge_msgs::FollowPathActionGoal action_goal;
         action_goal.header = goal->header;
         action_goal.goal.path = *goal;
 	m_actionPathPub.publish(action_goal);
@@ -466,15 +466,15 @@ bool PathFollower::getNextTarget(const nav_msgs::Path& path, const tf::Pose& rob
 }
 
 
-void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
+void PathFollower::pathActionCB(const naoqi_bridge_msgs::FollowPathGoalConstPtr &goal){
    nav_msgs::Path path = goal->path;
-   naoqi_msgs::FollowPathFeedback feedback;
+   naoqi_bridge_msgs::FollowPathFeedback feedback;
    
    if( path.poses.empty() )
    {
       ROS_INFO("Path following: Stop requested by sending empty path.");
       stopWalk();
-      m_walkPathServer.setSucceeded(naoqi_msgs::FollowPathResult(),"Stop succeeed");
+      m_walkPathServer.setSucceeded(naoqi_bridge_msgs::FollowPathResult(),"Stop succeeed");
       return;
    }
 
@@ -492,7 +492,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
       {
          ROS_ERROR("Could not get robot pose. Stopping robot");
          stopWalk();
-         m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(),"Aborted");
+         m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(),"Aborted");
          return;
       }
       else
@@ -518,7 +518,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
    {
       ROS_ERROR("Robot is too far away from start of plan. aborting");
       stopWalk();
-      m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(),"Aborted");
+      m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(),"Aborted");
       return;
    }
 
@@ -534,7 +534,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
          {
             ROS_ERROR("Could not get robot pose. Stopping robot");
             stopWalk();
-            m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(),"Aborted");
+            m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(),"Aborted");
             return;
          }
          else
@@ -555,14 +555,14 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
       if (m_walkPathServer.isPreemptRequested()){
          if(m_walkPathServer.isNewGoalAvailable()){
             ROS_INFO("walk_path ActionServer: new goal available");
-            naoqi_msgs::FollowPathGoal newGoal = *m_walkPathServer.acceptNewGoal();
+            naoqi_bridge_msgs::FollowPathGoal newGoal = *m_walkPathServer.acceptNewGoal();
             path = newGoal.path;
             // Check if path is not empty, otherwise abort
             if( path.poses.empty() )
             {
                ROS_INFO("Stop requested by sending empty path.");
                stopWalk();
-               m_walkPathServer.setSucceeded(naoqi_msgs::FollowPathResult(),"Stop succeeed");
+               m_walkPathServer.setSucceeded(naoqi_bridge_msgs::FollowPathResult(),"Stop succeeed");
                return;
             }
 
@@ -573,7 +573,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
             {
                ROS_ERROR("Robot is too far away from start of plan. aborting");
                stopWalk();
-               m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(),"Aborted");
+               m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(),"Aborted");
                return;
             }
 
@@ -595,7 +595,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
       if(m_useFootContactProtection && !m_footContact) {
          ROS_WARN("Lost foot contact, abort walk");
          stopWalk();
-         m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(), "Aborting on the goal because the robot lost foot contact with the ground");
+         m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(), "Aborting on the goal because the robot lost foot contact with the ground");
          return;
       }
 
@@ -621,7 +621,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
 
          stopWalk();
 
-         m_walkPathServer.setSucceeded(naoqi_msgs::FollowPathResult(), "Target reached");
+         m_walkPathServer.setSucceeded(naoqi_bridge_msgs::FollowPathResult(), "Target reached");
          return;
       } else if (!targetIsEndOfPath && relTarget.getOrigin().length()< m_waypointDistThres && std::abs(yaw) < m_waypointAngThres){
          // update currentPathPoseIt to point to waypoint corresponding to  targetPose
@@ -676,7 +676,7 @@ void PathFollower::pathActionCB(const naoqi_msgs::FollowPathGoalConstPtr &goal){
 
    // TODO: stopWalk is not completed if ctrl+c is hit FIX THIS!
    stopWalk();
-   m_walkPathServer.setAborted(naoqi_msgs::FollowPathResult(), "Aborting on the goal because the node has been killed");
+   m_walkPathServer.setAborted(naoqi_bridge_msgs::FollowPathResult(), "Aborting on the goal because the node has been killed");
 
 
 

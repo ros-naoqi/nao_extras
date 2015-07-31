@@ -3,7 +3,7 @@ project(nao_path_follower)
 
 # Declare main C++ dependencies
 set(ROS_CXX_DEPENDENCIES
-  naoqi_msgs
+  naoqi_bridge_msgs
   roscpp
   tf
   std_msgs

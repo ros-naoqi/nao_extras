@@ -37,11 +37,8 @@
 #include <std_msgs/String.h>
 #include <geometry_msgs/Twist.h>
 #include <std_srvs/Empty.h>
-#include <naoqi_msgs/JointAnglesWithSpeed.h>
-#include <naoqi_msgs/JointTrajectoryAction.h>
-#include <naoqi_msgs/BodyPoseAction.h>
-#include <naoqi_msgs/BodyPoseActionGoal.h>
-#include <naoqi_msgs/CmdVelService.h>
+#include <naoqi_bridge_msgs/JointAnglesWithSpeed.h>
+#include <naoqi_bridge_msgs/BodyPoseAction.h>
 #include <actionlib/client/simple_action_client.h>
 
 #include <sensor_msgs/Joy.h>
@@ -133,9 +130,9 @@ protected:
   ros::ServiceClient m_cmdVelClient;
   ros::ServiceClient m_stiffnessDisableClient;
   ros::ServiceClient m_stiffnessEnableClient;
-  actionlib::SimpleActionClient<naoqi_msgs::BodyPoseAction> m_bodyPoseClient;
+  actionlib::SimpleActionClient<naoqi_bridge_msgs::BodyPoseAction> m_bodyPoseClient;
   geometry_msgs::Twist m_motion;
-  naoqi_msgs::JointAnglesWithSpeed m_headAngles;
+  naoqi_bridge_msgs::JointAnglesWithSpeed m_headAngles;
 };
 }
 
