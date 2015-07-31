@@ -2,6 +2,11 @@
 Changelog for package nao_path_follower
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* get code to use naoqi_bridge_msgs and not naoqi_msgs
+* Contributors: Vincent Rabaud
+
 0.2.2 (2014-11-13)
 ------------------
 * comply to the new naoqi organization
