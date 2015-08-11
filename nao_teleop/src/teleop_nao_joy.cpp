@@ -40,7 +40,7 @@ namespace nao_teleop{
 TeleopNaoJoy::TeleopNaoJoy()
 : privateNh("~"), m_enabled(false),
   m_xAxis(3), m_yAxis(2), m_turnAxis(0), m_headYawAxis(4),	m_headPitchAxis(5),
-  m_crouchBtn(9), m_initPoseBtn(0), m_enableBtn(8), m_modifyHeadBtn(5),
+  m_crouchBtn(8), m_initPoseBtn(0), m_enableBtn(9), m_modifyHeadBtn(5),
   m_maxVx(1.0), m_maxVy(1.0), m_maxVw(0.5),
   m_maxHeadYaw(2.0943), m_maxHeadPitch(0.7853),
   m_bodyPoseTimeOut(5.0),
@@ -86,6 +86,7 @@ TeleopNaoJoy::TeleopNaoJoy()
         << "Is the pose_manager node running?");
   }
 
+  std::cout << "starting button is set to " << m_enableBtn << std::endl;
 }
 
 
@@ -171,8 +172,8 @@ void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
   // directional commands
   // walking velocities and head movements
   if (!axisValid(m_xAxis, joy) ||  !axisValid(m_yAxis, joy) || !axisValid(m_turnAxis, joy)){
-    m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0;
-    m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
+    m_motion.linear.x = m_motion.linear.y = m_motion.angular.z = 0.0f;
+    m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0f;
     ROS_WARN("Joystick message too short for Move or Turn axis!\n");
   } else{
     if (buttonPressed(m_modifyHeadBtn, joy)){
@@ -184,11 +185,12 @@ void TeleopNaoJoy::joyCallback(const Joy::ConstPtr& joy){
 
     } else {
       // stop head:
-      m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0;
+      m_headAngles.joint_angles[0] = m_headAngles.joint_angles[1] = 0.0f;
       // move base:
       m_motion.linear.x = m_maxVx * std::max(std::min(joy->axes[m_xAxis], 1.0f), -1.0f);
       m_motion.linear.y = m_maxVy * std::max(std::min(joy->axes[m_yAxis], 1.0f), -1.0f);
       m_motion.angular.z = m_maxVw * std::max(std::min(joy->axes[m_turnAxis], 1.0f), -1.0f);
+
     }
   }
 
@@ -261,9 +263,20 @@ bool TeleopNaoJoy::axisValid(int axis, const Joy::ConstPtr& joy) const{
  * \brief Publish motion message to Nao
  */
 void TeleopNaoJoy::pubMsg(){
-  if (m_enabled && m_inhibitCounter == 0) {
-    m_movePub.publish(m_motion);
-    m_headPub.publish(m_headAngles);
+  if (m_enabled && m_inhibitCounter == 0)
+  {
+
+    if (m_headAngles.joint_angles[0] != 0.0f || m_headAngles.joint_angles[1] != 0.0f )
+    {
+      m_headPub.publish(m_headAngles);
+      std::cout << "going to publish head angles" << std::endl;
+    }
+    if (m_motion.linear.x != 0.0f || m_motion.linear.y != 0.0f || m_motion.angular.z != 0.0f)
+    {
+      m_movePub.publish(m_motion);
+      std::cout << "going to publish motion commands" << std::endl;
+    }
+
   }
 }
 
