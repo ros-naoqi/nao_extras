@@ -2,6 +2,11 @@
 Changelog for package nao_teleop
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* publish only when move not zero
+* Contributors: Karsten Knese
+
 0.3.0 (2015-07-31)
 ------------------
 * get code to use naoqi_bridge_msgs and not naoqi_msgs

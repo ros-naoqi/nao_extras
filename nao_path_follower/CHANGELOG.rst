@@ -2,6 +2,9 @@
 Changelog for package nao_path_follower
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+
 0.3.0 (2015-07-31)
 ------------------
 * get code to use naoqi_bridge_msgs and not naoqi_msgs
