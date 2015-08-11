@@ -2,8 +2,8 @@
 Changelog for package nao_teleop
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.3.1 (2015-08-11)
+------------------
 * publish only when move not zero
 * Contributors: Karsten Knese
 
