@@ -107,8 +107,6 @@ protected:
   int m_initPoseBtn;
   int m_enableBtn;
   int m_modifyHeadBtn;
-  int m_startScanBtn;
-  int m_stopScanBtn;
   double m_maxVx;
   double m_maxVy;
   double m_maxVw;
