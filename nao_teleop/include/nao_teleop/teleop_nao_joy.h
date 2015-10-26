@@ -114,6 +114,8 @@ protected:
   double m_maxVw;
   double m_maxHeadYaw;
   double m_maxHeadPitch;
+  bool m_prevMotionZero;
+  bool m_prevHeadZero;
   ros::Duration m_bodyPoseTimeOut;
   int m_inhibitCounter;
 

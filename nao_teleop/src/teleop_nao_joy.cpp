@@ -45,7 +45,8 @@ TeleopNaoJoy::TeleopNaoJoy()
   m_maxHeadYaw(2.0943), m_maxHeadPitch(0.7853),
   m_bodyPoseTimeOut(5.0),
   m_inhibitCounter(0), m_previousJoystick_initialized(false),
-  m_bodyPoseClient("body_pose", true)
+  m_bodyPoseClient("body_pose", true),
+  m_prevMotionZero(true), m_prevHeadZero(true)
 {
   privateNh.param("axis_x", m_xAxis, m_xAxis);
   privateNh.param("axis_y", m_yAxis, m_yAxis);
@@ -265,17 +266,24 @@ bool TeleopNaoJoy::axisValid(int axis, const Joy::ConstPtr& joy) const{
 void TeleopNaoJoy::pubMsg(){
   if (m_enabled && m_inhibitCounter == 0)
   {
-
-    if (m_headAngles.joint_angles[0] != 0.0f || m_headAngles.joint_angles[1] != 0.0f )
+    const bool headZero = m_headAngles.joint_angles[0] == 0.0f && m_headAngles.joint_angles[1] == 0.0f;
+    // Send head angle only if it is non-zero or the previous angle was non-zero.
+    // This avoids sending zero angles repeatedly, which would interfere with other
+    // modules sending motion commands (e.g., planners) when the joystick is not in use.
+    if (!headZero || !m_prevHeadZero)
     {
       m_headPub.publish(m_headAngles);
       std::cout << "going to publish head angles" << std::endl;
     }
-    if (m_motion.linear.x != 0.0f || m_motion.linear.y != 0.0f || m_motion.angular.z != 0.0f)
+    m_prevHeadZero = headZero;
+
+    const bool motionZero = m_motion.linear.x == 0.0f && m_motion.linear.y == 0.0f && m_motion.angular.z == 0.0f;
+    if (!motionZero || !m_prevMotionZero)
     {
       m_movePub.publish(m_motion);
       std::cout << "going to publish motion commands" << std::endl;
     }
+    m_prevMotionZero = motionZero;
 
   }
 }
