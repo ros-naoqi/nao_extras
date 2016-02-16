@@ -107,13 +107,13 @@ protected:
   int m_initPoseBtn;
   int m_enableBtn;
   int m_modifyHeadBtn;
-  int m_startScanBtn;
-  int m_stopScanBtn;
   double m_maxVx;
   double m_maxVy;
   double m_maxVw;
   double m_maxHeadYaw;
   double m_maxHeadPitch;
+  bool m_prevMotionZero;
+  bool m_prevHeadZero;
   ros::Duration m_bodyPoseTimeOut;
   int m_inhibitCounter;
 
